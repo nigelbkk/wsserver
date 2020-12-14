@@ -8,21 +8,25 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Collections.Generic;
 
 [assembly: OwinStartup(typeof(Program.Startup))]
 namespace WSServer
 {
     class Program
     {
-        public OrdersUpdateDelegate OrdersEventSink = null;
+        //public StreamUpdateDelegate OrdersEventSink = null;
+        //public StreamUpdateDelegate MarketEventSink = null;
         static IDisposable SignalR;
 
         static void Main(string[] args)
         {
             string url = "http://88.202.183.202:8088";
-            url = "http://192.168.1.6:8088";
+            //url = "http://192.168.1.6:8088";
             SignalR = WebApp.Start(url);
 
+            Console.WriteLine("Waiting for connections on:  " + url);
             Console.ReadKey();
         }
         public class Startup
@@ -35,60 +39,72 @@ namespace WSServer
         [HubName("WebSocketsHub")]
         public class MyHub : Hub
         {
-            public static ConcurrentDictionary<string, string> Connections = new ConcurrentDictionary<string, string>();
+            public static HashSet<string> ConnectedIds = new HashSet<string>();
             private StreamingAPI streamingAPI = null;
             static int idx = 0;
             private static System.Timers.Timer timer = null;
             public MyHub()
             {
-                if (streamingAPI == null)
+            }
+            private void ConnectStreamingAPI()
+            {
+                Settings settings = Settings.DeSerialize();
+                streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password);
+                streamingAPI.MarketCallback += (String json) =>
                 {
-                    Settings settings = Settings.DeSerialize();
-                    streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password);
-                    StreamingAPI.Callback += (String json) =>
-                    {
-                        Clients.All.MarketChanged(json);
-                    };
+                    Clients.All.Notify("Market", json);
+                    Clients.All.MarketChanged(json);
+                };
 
-                    StreamingAPI.Callback += (String json) =>
-                    {
-                        Clients.All.ordersChanged(json);
-                    };
-                    timer = new System.Timers.Timer(1000) { Enabled = true, };
-                    timer.Elapsed += (s, a) =>
-                    {
-                        //Clients.All.addMessage(idx++, DateTime.Now.ToLongTimeString());
-                    };
-                }
+                streamingAPI.OrdersCallback += (String json) =>
+                {
+                    Clients.All.ordersChanged(json);
+                    Debug.WriteLine("OrdersCallback");
+
+                };
+                streamingAPI.SubscribeOrders();
             }
             public override Task OnConnected()
             {
                 Console.WriteLine(Context.ConnectionId + " connected from " + Context.Request.Url.Host);
+                if (streamingAPI == null)
+                {
+                    ConnectStreamingAPI();
+                }
+                ConnectedIds.Add(Context.ConnectionId);
                 return base.OnConnected();
+            }
+            public override Task OnReconnected()
+            {
+                Console.WriteLine(Context.ConnectionId + " reconnected from " + Context.Request.Url.Host);
+                ConnectedIds.Add(Context.ConnectionId);
+                return base.OnReconnected();
             }
             public override Task OnDisconnected(bool stopCalled)
             {
-                Console.WriteLine(Context.ConnectionId + " disconnected from " + Context.Request.Url.Host);
+                try
+                {
+                    Console.WriteLine(Context.ConnectionId + " disconnected from " + Context.Request.Url.Host);
+                }
+                catch(Exception)
+                {
+                    Console.WriteLine(Context.ConnectionId + " disconnected");
+                }
+                ConnectedIds.Remove(Context.ConnectionId);
+                if (ConnectedIds.Count == 0)
+                {
+                    streamingAPI = null;
+                }
                 return base.OnDisconnected(stopCalled);
             }
             public void Send(string message)
             {
-                Clients.All.addMessage(message, "Awooga");
+                Clients.All.Message(message);
             }
             public void SubscribeMarket(string marketid)
             {
                 Console.WriteLine(Context.ConnectionId + " subcribed to market " + marketid);
                 streamingAPI.SubscribeMarket(marketid);
-                Clients.Client(Context.ConnectionId).Message("You just subscribed to market " + marketid);
-            }
-            public void SubscribeOrders()
-            {
-                streamingAPI.SubscribeOrders();
-                Clients.All.Message("SubscribeOrders");
-            }
-            public void UnsubscribeOrders()
-            {
-                Clients.All.Message("message, ");
             }
         }
     }

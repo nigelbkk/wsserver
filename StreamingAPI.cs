@@ -12,11 +12,12 @@ using System.Diagnostics;
 
 namespace WSServer
 {
-//	public delegate void StreamUpdateDelegate(List<LiveRunner> liveRunners, double tradedVolume, bool inplay);
-	public delegate void OrdersUpdateDelegate(string json);
+	//public delegate void StreamUpdateDelegate(List<LiveRunner> liveRunners, double tradedVolume, bool inplay);
+	public delegate void StreamUpdateDelegate(string json);
 	class StreamingAPI
 	{
-		public static OrdersUpdateDelegate Callback = null;
+		public StreamUpdateDelegate OrdersCallback = null;
+		public StreamUpdateDelegate MarketCallback = null;
 		private static String ConnectionId { get; set; }
 		private static String MarketId { get; set; }
 		private static AppKeyAndSessionProvider SessionProvider { get; set; }
@@ -59,36 +60,22 @@ namespace WSServer
 				return _clientCache;
 			}
 		}
-		private static void OnMarketChanged(object sender, MarketChangedEventArgs e)
+		private void OnMarketChanged(object sender, MarketChangedEventArgs e)
 		{
 			try
 			{
-				//double tradedVolume = 0;
-
-				//_LiveRunners = new List<LiveRunner>();
-				//for (int i = 0; i < e.Snap.MarketRunners.Count; i++)
-				//{
-				//	LiveRunner lr = new LiveRunner();
-				//	lr.SetPrices(e.Snap.MarketRunners[i]);
-				//	_LiveRunners.Add(lr);
-				//	tradedVolume += e.Snap.MarketRunners[i].Prices.TradedVolume;
-				//}
-				String json = JsonConvert.SerializeObject(e.Snap.MarketRunners);
-				Callback?.Invoke(json);
+				MarketCallback?.Invoke(e.Change.ToJson());
 			}
 			catch (Exception xe)
 			{
 			}
 		}
-		private static void OnOrderChanged(object sender, OrderMarketChangedEventArgs e)
+		private void OnOrderChanged(object sender, OrderMarketChangedEventArgs e)
 		{
 			try
 			{
-				Debug.WriteLine(e.Change.ToJson());
-				if (Callback != null)
-				{
-					Callback(e.Change.ToJson());
-				}
+				String json = JsonConvert.SerializeObject(e.Snap);
+				OrdersCallback(json);
 			}
 			catch (Exception xe)
 			{
