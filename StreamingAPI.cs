@@ -13,7 +13,7 @@ using System.Diagnostics;
 namespace WSServer
 {
 	//public delegate void StreamUpdateDelegate(List<LiveRunner> liveRunners, double tradedVolume, bool inplay);
-	public delegate void StreamUpdateDelegate(string json);
+	public delegate void StreamUpdateDelegate(string json1, string json2, string json3);
 	class StreamingAPI
 	{
 		public StreamUpdateDelegate OrdersCallback = null;
@@ -64,7 +64,7 @@ namespace WSServer
 		{
 			try
 			{
-				MarketCallback?.Invoke(e.Change.ToJson());
+//				MarketCallback?.Invoke(e.Change.ToJson());
 			}
 			catch (Exception xe)
 			{
@@ -74,8 +74,10 @@ namespace WSServer
 		{
 			try
 			{
-				String json = JsonConvert.SerializeObject(e.Snap);
-				OrdersCallback(json);
+				OrdersCallback(
+					JsonConvert.SerializeObject(e.Change),
+					JsonConvert.SerializeObject(e.OrderMarket),
+					JsonConvert.SerializeObject(e.Snap));
 			}
 			catch (Exception xe)
 			{

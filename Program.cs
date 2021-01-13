@@ -5,9 +5,7 @@ using Microsoft.Owin;
 using Microsoft.Owin.Hosting;
 using Owin;
 using System;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Collections.Generic;
 
@@ -16,15 +14,16 @@ namespace WSServer
 {
     class Program
     {
-        //public StreamUpdateDelegate OrdersEventSink = null;
-        //public StreamUpdateDelegate MarketEventSink = null;
         static IDisposable SignalR;
 
         static void Main(string[] args)
         {
             string url = "http://88.202.183.202:8088";
-            //url = "http://192.168.1.6:8088";
+            url = "http://*:8088";
+ //           url = "http://127.0.0.1:8088";
             SignalR = WebApp.Start(url);
+
+            
 
             Console.WriteLine("Waiting for connections on:  " + url);
             Console.ReadKey();
@@ -41,42 +40,34 @@ namespace WSServer
         {
             public static HashSet<string> ConnectedIds = new HashSet<string>();
             private StreamingAPI streamingAPI = null;
-            static int idx = 0;
-            private static System.Timers.Timer timer = null;
-            public MyHub()
-            {
-            }
             private void ConnectStreamingAPI()
             {
                 Settings settings = Settings.DeSerialize();
                 streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password);
-                streamingAPI.MarketCallback += (String json) =>
+                streamingAPI.OrdersCallback += (String json1, String json2, String json3) =>
                 {
-                    Clients.All.Notify("Market", json);
-                    Clients.All.MarketChanged(json);
-                };
-
-                streamingAPI.OrdersCallback += (String json) =>
-                {
-                    Clients.All.ordersChanged(json);
-                    Debug.WriteLine("OrdersCallback");
-
+                    Clients.All.ordersChanged(json1, json2, json3);
                 };
                 streamingAPI.SubscribeOrders();
             }
             public override Task OnConnected()
             {
-                Console.WriteLine(Context.ConnectionId + " connected from " + Context.Request.Url.Host);
+                object ipAddress;
+
                 if (streamingAPI == null)
                 {
                     ConnectStreamingAPI();
                 }
+                Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
+                Console.WriteLine(ipAddress + " connected");
                 ConnectedIds.Add(Context.ConnectionId);
                 return base.OnConnected();
             }
             public override Task OnReconnected()
             {
-                Console.WriteLine(Context.ConnectionId + " reconnected from " + Context.Request.Url.Host);
+                object ipAddress;
+                Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
+                Console.WriteLine(ipAddress + " reconnected");
                 ConnectedIds.Add(Context.ConnectionId);
                 return base.OnReconnected();
             }
@@ -84,7 +75,9 @@ namespace WSServer
             {
                 try
                 {
-                    Console.WriteLine(Context.ConnectionId + " disconnected from " + Context.Request.Url.Host);
+                    object ipAddress;
+                    Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
+                    Console.WriteLine(ipAddress + " disconnected");
                 }
                 catch(Exception)
                 {
@@ -93,7 +86,7 @@ namespace WSServer
                 ConnectedIds.Remove(Context.ConnectionId);
                 if (ConnectedIds.Count == 0)
                 {
-                    streamingAPI = null;
+//                    streamingAPI = null;
                 }
                 return base.OnDisconnected(stopCalled);
             }
