@@ -20,11 +20,7 @@ namespace WSServer
         {
             string url = "http://88.202.183.202:8088";
             url = "http://*:8088";
- //           url = "http://127.0.0.1:8088";
             SignalR = WebApp.Start(url);
-
-            
-
             Console.WriteLine("Waiting for connections on:  " + url);
             Console.ReadKey();
         }
@@ -59,7 +55,7 @@ namespace WSServer
                     ConnectStreamingAPI();
                 }
                 Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-                Console.WriteLine(ipAddress + " connected");
+                Console.WriteLine(DateTime.UtcNow.ToShortTimeString() + " " + ipAddress + " connected");
                 ConnectedIds.Add(Context.ConnectionId);
                 return base.OnConnected();
             }
@@ -67,7 +63,7 @@ namespace WSServer
             {
                 object ipAddress;
                 Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-                Console.WriteLine(ipAddress + " reconnected");
+                Console.WriteLine(DateTime.UtcNow.ToShortTimeString() + " " + ipAddress + " reconnected");
                 ConnectedIds.Add(Context.ConnectionId);
                 return base.OnReconnected();
             }
@@ -77,9 +73,9 @@ namespace WSServer
                 {
                     object ipAddress;
                     Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-                    Console.WriteLine(ipAddress + " disconnected");
+                    Console.WriteLine(DateTime.UtcNow.ToShortTimeString() + " " + ipAddress + " disconnected");
                 }
-                catch(Exception)
+                catch (Exception)
                 {
                     Console.WriteLine(Context.ConnectionId + " disconnected");
                 }
