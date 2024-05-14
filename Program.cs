@@ -18,8 +18,8 @@ namespace WSServer
 
         static void Main(string[] args)
         {
-            string url = "http://88.202.183.202:8088";
-            url = "http://*:8088";
+            string url = "http://88.202.230.157:8088";
+           // url = "http://*:8088";
             SignalR = WebApp.Start(url);
             Console.WriteLine("Waiting for connections on:  " + url);
             Console.ReadKey();
@@ -39,9 +39,10 @@ namespace WSServer
             private void ConnectStreamingAPI()
             {
                 Settings settings = Settings.DeSerialize();
-                streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password);
+                streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password, settings.Cert, settings.CertPassword);
                 streamingAPI.OrdersCallback += (String json1, String json2, String json3) =>
                 {
+                    Debug.WriteLine("OrdersCallback");
                     Clients.All.ordersChanged(json1, json2, json3);
                 };
                 streamingAPI.SubscribeOrders();
@@ -55,7 +56,7 @@ namespace WSServer
                     ConnectStreamingAPI();
                 }
                 Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-                Console.WriteLine(DateTime.UtcNow.ToShortTimeString() + " " + ipAddress + " connected");
+                Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " connected");
                 ConnectedIds.Add(Context.ConnectionId);
                 return base.OnConnected();
             }
@@ -63,7 +64,7 @@ namespace WSServer
             {
                 object ipAddress;
                 Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-                Console.WriteLine(DateTime.UtcNow.ToShortTimeString() + " " + ipAddress + " reconnected");
+                Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " reconnected");
                 ConnectedIds.Add(Context.ConnectionId);
                 return base.OnReconnected();
             }
@@ -73,7 +74,7 @@ namespace WSServer
                 {
                     object ipAddress;
                     Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-                    Console.WriteLine(DateTime.UtcNow.ToShortTimeString() + " " + ipAddress + " disconnected");
+                    Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " disconnected");
                 }
                 catch (Exception)
                 {

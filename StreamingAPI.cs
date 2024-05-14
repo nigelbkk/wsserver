@@ -22,16 +22,18 @@ namespace WSServer
 		private static String MarketId { get; set; }
 		private static AppKeyAndSessionProvider SessionProvider { get; set; }
 		private static ClientCache _clientCache;
-		private static string _host = "stream-api.betfair.com";
+//		private static string _host = "stream-api.betfair.com";
+		private static string _host = "stream-api-integration.betfair.com";
+		
 		private static int _port = 443;
 
 		//public List<LiveRunner> LiveRunners { get; set; }
 		//private static List<LiveRunner> _LiveRunners { get; set; }
 		//private static Properties.Settings props = Properties.Settings.Default;
-		
-		public StreamingAPI(String AppKey, String BFUser, String BFPassword)
+
+		public StreamingAPI(String AppKey, String BFUser, String BFPassword, string cert, string cert_password)
 		{
-			NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword);
+			NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
 			ClientCache.Client.ConnectionStatusChanged += (o, e) =>
 			{
 				if (!String.IsNullOrEmpty(e.ConnectionId))
@@ -40,9 +42,9 @@ namespace WSServer
 				}
 			};
 		}
-		public void NewSessionProvider(string ssohost, string appkey, string username, string password)
+		public void NewSessionProvider(string ssohost, string appkey, string username, string password, string cert, string cert_password)
 		{
-			AppKeyAndSessionProvider sessionProvider = new AppKeyAndSessionProvider(ssohost, appkey, username, password);
+			AppKeyAndSessionProvider sessionProvider = new AppKeyAndSessionProvider(ssohost, appkey, username, password, cert, cert_password);
 			SessionProvider = sessionProvider;
 		}
 		public ClientCache ClientCache
@@ -64,7 +66,8 @@ namespace WSServer
 		{
 			try
 			{
-//				MarketCallback?.Invoke(e.Change.ToJson());
+//Manual stake entry
+				MarketCallback?.Invoke(e.Change.ToJson(), "", "");
 			}
 			catch (Exception xe)
 			{
