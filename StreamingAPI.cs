@@ -22,8 +22,8 @@ namespace WSServer
 		private static String MarketId { get; set; }
 		private static AppKeyAndSessionProvider SessionProvider { get; set; }
 		private static ClientCache _clientCache;
-//		private static string _host = "stream-api.betfair.com";
-		private static string _host = "stream-api-integration.betfair.com";
+		private static string _host = "stream-api.betfair.com";
+//		private static string _host = "stream-api-integration.betfair.com";
 		
 		private static int _port = 443;
 
@@ -44,7 +44,7 @@ namespace WSServer
 		}
 		public void NewSessionProvider(string ssohost, string appkey, string username, string password, string cert, string cert_password)
 		{
-			AppKeyAndSessionProvider sessionProvider = new AppKeyAndSessionProvider(ssohost, appkey, username, password, cert, cert_password);
+			AppKeyAndSessionProvider sessionProvider = new AppKeyAndSessionProvider(ssohost, appkey, username, password, cert, cert_password, "session_token");
 			SessionProvider = sessionProvider;
 		}
 		public ClientCache ClientCache

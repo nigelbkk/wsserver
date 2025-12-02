@@ -8,6 +8,7 @@ using System;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Web.Http;
 
 [assembly: OwinStartup(typeof(Program.Startup))]
 namespace WSServer
@@ -19,23 +20,44 @@ namespace WSServer
         static void Main(string[] args)
         {
             string url = "http://88.202.230.157:8088";
-           // url = "http://*:8088";
-            SignalR = WebApp.Start(url);
+            url = "http://*:8088";
+
+            SignalR = WebApp.Start<Startup>(url);
             Console.WriteLine("Waiting for connections on:  " + url);
             Console.ReadKey();
         }
+
         public class Startup
         {
             public void Configuration(IAppBuilder app)
             {
+                Console.WriteLine("Startup.Configuration called!");
+                HttpConfiguration config = new HttpConfiguration();
+
+                config.Routes.MapHttpRoute(
+                    name: "DefaultApi",
+                    routeTemplate: "api/{controller}/{action}/{id}",
+                    defaults: new { id = RouteParameter.Optional }
+                );
+
+                // Simpler way to check controllers
+                var controllerSelector = config.Services.GetService(typeof(System.Web.Http.Dispatcher.IHttpControllerSelector));
+                Console.WriteLine($"Controller selector: {controllerSelector?.GetType().Name}");
+
+                app.UseWebApi(config);
+                Console.WriteLine("Web API configured");
+
                 app.MapSignalR();
+                Console.WriteLine("SignalR mapped");
             }
         }
+
+
         [HubName("WebSocketsHub")]
         public class MyHub : Hub
         {
             public static HashSet<string> ConnectedIds = new HashSet<string>();
-            private StreamingAPI streamingAPI = null;
+            private static StreamingAPI streamingAPI = null;
             private void ConnectStreamingAPI()
             {
                 Settings settings = Settings.DeSerialize();
@@ -91,11 +113,74 @@ namespace WSServer
             {
                 Clients.All.Message(message);
             }
+            // Add public static accessor
+            public static StreamingAPI GetStreamingAPI()
+            {
+                return streamingAPI;
+            }
             public void SubscribeMarket(string marketid)
             {
                 Console.WriteLine(Context.ConnectionId + " subcribed to market " + marketid);
                 streamingAPI.SubscribeMarket(marketid);
             }
+        }
+    }
+    public class TestController : ApiController
+    {
+        public class MarketSubscribeRequest
+        {
+            public string MarketId { get; set; }
+        }
+
+        public class EchoRequest
+        {
+            public string Text { get; set; }
+            public int Count { get; set; }
+        }
+
+
+        [HttpPost]
+        [Route("api/market/subscribe")]
+        public IHttpActionResult SubscribeMarket([FromBody] MarketSubscribeRequest request)
+        {
+            var api = Program.MyHub.GetStreamingAPI();
+
+            if (api == null)
+            {
+                return BadRequest("Streaming API not connected");
+            }
+
+            api.SubscribeMarket(request.MarketId);
+            return Ok(new { subscribed = request.MarketId });
+        }
+        
+        // GET api/test/status
+        [HttpGet]
+        public IHttpActionResult Status()
+        {
+            Console.WriteLine("Status endpoint hit!");
+
+            var api = Program.MyHub.GetStreamingAPI();
+
+            if (api == null)
+            {
+                return BadRequest("Streaming API not connected");
+            }
+
+            api.SubscribeMarket("1.78587954");
+
+
+
+
+            return Ok(new { status = "running", time = DateTime.Now });
+        }
+
+        // POST api/test/echo
+        [HttpPost]
+        public IHttpActionResult Echo([FromBody] EchoRequest req)
+        {
+            Console.WriteLine("Echo endpoint hit!");
+            return Ok(new { message = $"echo received {req.Text}", time = DateTime.Now });
         }
     }
 }
