@@ -34,11 +34,8 @@ namespace WSServer
                 Console.WriteLine("Startup.Configuration called!");
                 HttpConfiguration config = new HttpConfiguration();
 
-                config.Routes.MapHttpRoute(
-                    name: "DefaultApi",
-                    routeTemplate: "api/{controller}/{action}/{id}",
-                    defaults: new { id = RouteParameter.Optional }
-                );
+                config.MapHttpAttributeRoutes();
+                config.Routes.MapHttpRoute( name: "DefaultApi", routeTemplate: "api/{controller}/{action}/{id}", defaults: new { id = RouteParameter.Optional } );
 
                 // Simpler way to check controllers
                 var controllerSelector = config.Services.GetService(typeof(System.Web.Http.Dispatcher.IHttpControllerSelector));
@@ -51,8 +48,6 @@ namespace WSServer
                 Console.WriteLine("SignalR mapped");
             }
         }
-
-
         [HubName("WebSocketsHub")]
         public class MyHub : Hub
         {
@@ -125,22 +120,17 @@ namespace WSServer
             }
         }
     }
-    public class TestController : ApiController
+
+    [RoutePrefix("api/market")]
+    public class MarketController : ApiController
     {
         public class MarketSubscribeRequest
         {
             public string MarketId { get; set; }
         }
 
-        public class EchoRequest
-        {
-            public string Text { get; set; }
-            public int Count { get; set; }
-        }
-
-
         [HttpPost]
-        [Route("api/market/subscribe")]
+        [Route("subscribe")]
         public IHttpActionResult SubscribeMarket([FromBody] MarketSubscribeRequest request)
         {
             var api = Program.MyHub.GetStreamingAPI();
@@ -153,7 +143,17 @@ namespace WSServer
             api.SubscribeMarket(request.MarketId);
             return Ok(new { subscribed = request.MarketId });
         }
-        
+    }
+
+    public class TestController : ApiController
+    {
+        public class EchoRequest
+        {
+            public string Text { get; set; }
+            public int Count { get; set; }
+        }
+
+
         // GET api/test/status
         [HttpGet]
         public IHttpActionResult Status()
@@ -166,12 +166,7 @@ namespace WSServer
             {
                 return BadRequest("Streaming API not connected");
             }
-
             api.SubscribeMarket("1.78587954");
-
-
-
-
             return Ok(new { status = "running", time = DateTime.Now });
         }
 
