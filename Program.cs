@@ -1,14 +1,15 @@
-﻿using WSServer;
-using Microsoft.AspNet.SignalR;
+﻿using Microsoft.AspNet.SignalR;
 using Microsoft.AspNet.SignalR.Hubs;
 using Microsoft.Owin;
 using Microsoft.Owin.Hosting;
 using Owin;
 using System;
-using System.Threading.Tasks;
-using System.Diagnostics;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.Remoting.Contexts;
+using System.Threading.Tasks;
 using System.Web.Http;
+using WSServer;
 
 [assembly: OwinStartup(typeof(Program.Startup))]
 namespace WSServer
@@ -19,7 +20,8 @@ namespace WSServer
 
         static void Main(string[] args)
         {
-            string url = "http://88.202.230.157:8088";
+			string url = "http://88.202.230.157:8088";
+			url = "http://127.0.0.1:8088";
             url = "http://*:8088";
 
             SignalR = WebApp.Start<Startup>(url);
@@ -59,24 +61,33 @@ namespace WSServer
                 streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password, settings.Cert, settings.CertPassword);
                 streamingAPI.OrdersCallback += (String json1, String json2, String json3) =>
                 {
-                    Debug.WriteLine("OrdersCallback");
+                    //Debug.WriteLine("OrdersCallback");
                     Clients.All.ordersChanged(json1, json2, json3);
                 };
                 streamingAPI.SubscribeOrders();
             }
             public override Task OnConnected()
             {
-                object ipAddress;
-
-                if (streamingAPI == null)
+                try
                 {
-                    ConnectStreamingAPI();
+                    object ipAddress;
+
+                    if (streamingAPI == null)
+                    {
+                        ConnectStreamingAPI();
+                    }
+                    Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
+                    Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " connected");
+                    ConnectedIds.Add(Context.ConnectionId);
+                    return base.OnConnected();
                 }
-                Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-                Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " connected");
-                ConnectedIds.Add(Context.ConnectionId);
-                return base.OnConnected();
-            }
+				catch (Exception ex)
+				{
+					Debug.WriteLine($"OnConnected ERROR: {ex.Message}");
+					Debug.WriteLine($"Stack: {ex.StackTrace}");
+					throw; // Re-throw so you see it in logs
+				}
+			}
             public override Task OnReconnected()
             {
                 object ipAddress;
@@ -113,11 +124,11 @@ namespace WSServer
             {
                 return streamingAPI;
             }
-            public void SubscribeMarket(string marketid)
-            {
-                Console.WriteLine(Context.ConnectionId + " subcribed to market " + marketid);
-                streamingAPI.SubscribeMarket(marketid);
-            }
+            //public void SubscribeMarket(string marketid)
+            //{
+            //    Console.WriteLine(Context.ConnectionId + " subcribed to market " + marketid);
+            //    streamingAPI.SubscribeMarket(marketid);
+            //}
         }
     }
 
@@ -140,7 +151,10 @@ namespace WSServer
                 return BadRequest("Streaming API not connected");
             }
 
-            api.SubscribeMarket(request.MarketId);
+			//    Console.WriteLine(Context.ConnectionId + " subcribed to market " + marketid);
+			Console.WriteLine($"subcribe to market {request.MarketId}");
+
+			api.SubscribeMarket(request.MarketId);
             return Ok(new { subscribed = request.MarketId });
         }
     }

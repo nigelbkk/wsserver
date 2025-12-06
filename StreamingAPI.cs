@@ -12,7 +12,6 @@ using System.Diagnostics;
 
 namespace WSServer
 {
-	//public delegate void StreamUpdateDelegate(List<LiveRunner> liveRunners, double tradedVolume, bool inplay);
 	public delegate void StreamUpdateDelegate(string json1, string json2, string json3);
 	class StreamingAPI
 	{
@@ -27,12 +26,9 @@ namespace WSServer
 		
 		private static int _port = 443;
 
-		//public List<LiveRunner> LiveRunners { get; set; }
-		//private static List<LiveRunner> _LiveRunners { get; set; }
-		//private static Properties.Settings props = Properties.Settings.Default;
-
 		public StreamingAPI(String AppKey, String BFUser, String BFPassword, string cert, string cert_password)
 		{
+			Console.WriteLine("StreamingAPI ctor");
 			NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
 			ClientCache.Client.ConnectionStatusChanged += (o, e) =>
 			{
@@ -66,24 +62,22 @@ namespace WSServer
 		{
 			try
 			{
-//Manual stake entry
 				MarketCallback?.Invoke(e.Change.ToJson(), "", "");
 			}
 			catch (Exception xe)
 			{
+				Debug.WriteLine(xe.Message);
 			}
 		}
 		private void OnOrderChanged(object sender, OrderMarketChangedEventArgs e)
 		{
 			try
 			{
-				OrdersCallback(
-					JsonConvert.SerializeObject(e.Change),
-					JsonConvert.SerializeObject(e.OrderMarket),
-					JsonConvert.SerializeObject(e.Snap));
+				OrdersCallback( JsonConvert.SerializeObject(e.Change), JsonConvert.SerializeObject(e.OrderMarket), JsonConvert.SerializeObject(e.Snap)); 
 			}
 			catch (Exception xe)
 			{
+				Debug.WriteLine($"{xe.Message}");
 			}
 		}
 		public void SubscribeMarket(String marketID)
@@ -91,10 +85,7 @@ namespace WSServer
 			Console.WriteLine("Start " + MarketId);
 			MarketFilter f = new MarketFilter()
 			{
-				//CountryCodes = new List<string>() { "GB" },
 				BettingTypes = new List<MarketFilter.BettingTypesEnum?>() { MarketFilter.BettingTypesEnum.Odds },
-				//MarketTypes = new List<string>() { "WIN" },
-				//EventTypeIds = new List<string>() { "7" },
 				MarketIds = new List<string>() { marketID }
 			};
 

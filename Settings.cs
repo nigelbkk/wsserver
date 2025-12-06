@@ -1,7 +1,8 @@
 ﻿using System;
-using System.Xml.Serialization;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Xml.Serialization;
 
 namespace WSServer
 {
@@ -47,6 +48,7 @@ namespace WSServer
 			}
 			catch (Exception ex)
 			{
+				Debug.WriteLine(ex.Message);
 			}
 			return returnObject;
 		}
