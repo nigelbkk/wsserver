@@ -17,6 +17,9 @@ namespace WSServer
 	{
 		public StreamUpdateDelegate OrdersCallback = null;
 		public StreamUpdateDelegate MarketCallback = null;
+		public DateTime LastIncomingMessageTime;
+		public OrderMarketChangedEventArgs LastIncomingMessage;
+		public OrderMarketChangedEventArgs LastOutgoingMessage;
 		private static String ConnectionId { get; set; }
 		private static String MarketId { get; set; }
 		private static AppKeyAndSessionProvider SessionProvider { get; set; }
@@ -62,6 +65,7 @@ namespace WSServer
 		{
 			try
 			{
+				Debug.WriteLine($"OnMarketChanged");
 				MarketCallback?.Invoke(e.Change.ToJson(), "", "");
 			}
 			catch (Exception xe)
@@ -73,6 +77,8 @@ namespace WSServer
 		{
 			try
 			{
+				LastIncomingMessage = e;
+				LastIncomingMessageTime = DateTime.UtcNow;
 				OrdersCallback( JsonConvert.SerializeObject(e.Change), JsonConvert.SerializeObject(e.OrderMarket), JsonConvert.SerializeObject(e.Snap)); 
 			}
 			catch (Exception xe)

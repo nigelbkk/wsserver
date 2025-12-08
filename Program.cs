@@ -6,6 +6,7 @@ using Owin;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Runtime.Remoting.Contexts;
 using System.Threading.Tasks;
 using System.Web.Http;
@@ -54,6 +55,9 @@ namespace WSServer
         public class MyHub : Hub
         {
             public static HashSet<string> ConnectedIds = new HashSet<string>();
+			public static Tuple<String, DateTime> LastConnection;
+			public static Tuple<String, DateTime> LastReConnection;
+			public static Tuple<String, DateTime> LastDisConnection;
             private static StreamingAPI streamingAPI = null;
             private void ConnectStreamingAPI()
             {
@@ -79,7 +83,9 @@ namespace WSServer
                     Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
                     Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " connected");
                     ConnectedIds.Add(Context.ConnectionId);
-                    return base.OnConnected();
+					LastConnection=new Tuple<string, DateTime> (Context.ConnectionId, DateTime.UtcNow );
+
+					return base.OnConnected();
                 }
 				catch (Exception ex)
 				{
@@ -94,7 +100,8 @@ namespace WSServer
                 Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
                 Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " reconnected");
                 ConnectedIds.Add(Context.ConnectionId);
-                return base.OnReconnected();
+				LastReConnection = new Tuple<string, DateTime>(Context.ConnectionId, DateTime.UtcNow);
+				return base.OnReconnected();
             }
             public override Task OnDisconnected(bool stopCalled)
             {
@@ -103,13 +110,15 @@ namespace WSServer
                     object ipAddress;
                     Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
                     Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " disconnected");
-                }
-                catch (Exception)
+				}
+				catch (Exception)
                 {
                     Console.WriteLine(Context.ConnectionId + " disconnected");
                 }
                 ConnectedIds.Remove(Context.ConnectionId);
-                if (ConnectedIds.Count == 0)
+				LastDisConnection = new Tuple<string, DateTime>(Context.ConnectionId, DateTime.UtcNow);
+
+				if (ConnectedIds.Count == 0)
                 {
 //                    streamingAPI = null;
                 }
@@ -151,15 +160,36 @@ namespace WSServer
                 return BadRequest("Streaming API not connected");
             }
 
-			//    Console.WriteLine(Context.ConnectionId + " subcribed to market " + marketid);
-			Console.WriteLine($"subcribe to market {request.MarketId}");
+            //
+            Console.WriteLine($"subcribe to market {request.MarketId}");
 
 			api.SubscribeMarket(request.MarketId);
             return Ok(new { subscribed = request.MarketId });
         }
-    }
+		[HttpGet]
+		public IHttpActionResult Capture()
+		{
+			Console.WriteLine("Capture endpoint hit", DateTime.UtcNow);
+			var api = Program.MyHub.GetStreamingAPI();
 
-    public class TestController : ApiController
+			if (api == null)
+			{
+				return BadRequest("Streaming API not connected");
+			}
+			return Ok(new { 
+                status = "running", 
+                time = DateTime.Now,
+				LastIncomingMessageTime = api.LastIncomingMessageTime,
+				LastConnection = Program.MyHub.LastConnection,
+				LastDisConnection = Program.MyHub.LastDisConnection,
+				LastReConnection = Program.MyHub.LastReConnection,
+                Program.MyHub.ConnectedIds,
+				LastIncomingMessage = api.LastIncomingMessage
+            });
+		}
+	}
+
+	public class TestController : ApiController
     {
         public class EchoRequest
         {
@@ -168,24 +198,37 @@ namespace WSServer
         }
 
 
-        // GET api/test/status
-        [HttpGet]
-        public IHttpActionResult Status()
-        {
-            Console.WriteLine("Status endpoint hit!");
+		// GET api/test/status
+		[HttpGet]
+		public IHttpActionResult Status()
+		{
+			Console.WriteLine("Status endpoint hit", DateTime.UtcNow);
+			var api = Program.MyHub.GetStreamingAPI();
 
-            var api = Program.MyHub.GetStreamingAPI();
+			if (api == null)
+			{
+				return BadRequest("Streaming API not connected");
+			}
+			return Ok(new { status = "running", time = DateTime.Now, } );
+		}
 
-            if (api == null)
-            {
-                return BadRequest("Streaming API not connected");
-            }
-            api.SubscribeMarket("1.78587954");
-            return Ok(new { status = "running", time = DateTime.Now });
-        }
+		[HttpPost]
+		public IHttpActionResult Stop()
+		{
+			Console.WriteLine("Stop endpoint hit!");
 
-        // POST api/test/echo
-        [HttpPost]
+			var api = Program.MyHub.GetStreamingAPI();
+
+			if (api == null)
+			{
+				return BadRequest("Streaming API not connected");
+			}
+            api.Stop();
+			return Ok("Server stopped");
+		}
+
+		// POST api/test/echo
+		[HttpPost]
         public IHttpActionResult Echo([FromBody] EchoRequest req)
         {
             Console.WriteLine("Echo endpoint hit!");
