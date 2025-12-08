@@ -28,10 +28,11 @@ namespace WSServer
 
 		public StreamingAPI(String AppKey, String BFUser, String BFPassword, string cert, string cert_password)
 		{
-			Console.WriteLine("StreamingAPI ctor");
 			NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
 			ClientCache.Client.ConnectionStatusChanged += (o, e) =>
 			{
+				Console.WriteLine($"ConnectionStatusChanged from {e.Old} to {e.New}");
+				Console.WriteLine($"ConnectionStatusChanged from {e.Old} to {e.New}");
 				if (!String.IsNullOrEmpty(e.ConnectionId))
 				{
 					ConnectionId = e.ConnectionId;
