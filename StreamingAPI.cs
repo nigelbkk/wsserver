@@ -32,7 +32,22 @@ namespace WSServer
 		public StreamingAPI(String AppKey, String BFUser, String BFPassword, string cert, string cert_password)
 		{
 			Console.WriteLine("StreamingAPI ctor");
+
+			// Save and clear ONLY Trace listeners
+			var savedListeners = Trace.Listeners.Cast<TraceListener>().ToList();
+			Trace.Listeners.Clear();
+
+			// Betfair login
 			NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
+
+			// Restore Trace listeners
+			foreach (var listener in savedListeners)
+			{
+				//Trace.Listeners.Add(listener);
+			}
+
+
+			//NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
 			ClientCache.Client.ConnectionStatusChanged += (o, e) =>
 			{
 				if (!String.IsNullOrEmpty(e.ConnectionId))

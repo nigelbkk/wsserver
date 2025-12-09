@@ -178,7 +178,7 @@ namespace WSServer
 			}
 			return Ok(new { 
                 status = "running", 
-                time = DateTime.Now,
+                time = DateTime.UtcNow,
 				LastIncomingMessageTime = api.LastIncomingMessageTime,
 				LastConnection = Program.MyHub.LastConnection,
 				LastDisConnection = Program.MyHub.LastDisConnection,
