@@ -33,7 +33,7 @@ namespace WSServer
 			streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password, settings.Cert, settings.CertPassword);
 
 
-			Console.WriteLine("Waiting for connections on:  " + url);
+			Debug.WriteLine("Waiting for connections on:  " + url);
             Console.ReadKey();
         }
 
@@ -41,23 +41,23 @@ namespace WSServer
         {
             public void Configuration(IAppBuilder app)
             {
-                Console.WriteLine("Startup.Configuration called!");
+				Debug.WriteLine("Startup.Configuration called!");
                 HttpConfiguration config = new HttpConfiguration();
 
                 config.MapHttpAttributeRoutes();
                 config.Routes.MapHttpRoute( name: "DefaultApi", routeTemplate: "api/{controller}/{action}/{id}", defaults: new { id = RouteParameter.Optional } );
 
-                // Simpler way to check controllers
-                var controllerSelector = config.Services.GetService(typeof(System.Web.Http.Dispatcher.IHttpControllerSelector));
-                Console.WriteLine($"Controller selector: {controllerSelector?.GetType().Name}");
+				// Simpler way to check controllers
+				//var controllerSelector = config.Services.GetService(typeof(System.Web.Http.Dispatcher.IHttpControllerSelector));
+				//Debug.WriteLine($"Controller selector: {controllerSelector?.GetType().Name}");
 
-                app.UseWebApi(config);
-                Console.WriteLine("Web API configured");
+				app.UseWebApi(config);
+				//Debug.WriteLine("Web API configured");
 
-                app.MapSignalR();
-                Console.WriteLine("SignalR mapped");
-            }
-        }
+				app.MapSignalR();
+				//Debug.WriteLine("SignalR mapped");
+			}
+		}
         [HubName("WebSocketsHub")]
         public class MyHub : Hub
         {
@@ -76,7 +76,7 @@ namespace WSServer
             {
 				Debug.WriteLine("Hub ConnectStreamingAPI");
 				Settings settings = Settings.DeSerialize();
-                streamingAPI = Program.streamingAPI;// new StreamingAPI(settings.AppID, settings.Account, settings.Password, settings.Cert, settings.CertPassword);
+                streamingAPI = Program.streamingAPI;
 				streamingAPI.OrdersCallback += (String json1, String json2, String json3) =>
 				{
 					//Debug.WriteLine("Hub OrdersCallback");
@@ -85,14 +85,13 @@ namespace WSServer
 				Debug.WriteLine("Setting MarktCallback");
 				streamingAPI.MarketCallback += (String json1, String json2, String json3) =>
 				{
-					Debug.WriteLine($"Hub MarktCallback: {json1}");
+					//Debug.WriteLine($"Hub MarktCallback: {json1}");
 					Clients.All.marketChanged(json1, json2, json3);
 				};
-				//streamingAPI.SubscribeOrders();
 			}
 			public override Task OnConnected()
             {
-				Debug.WriteLine("OnConnected");
+				Debug.WriteLine("Hub OnConnected");
 				try
 				{
                     object ipAddress;
@@ -102,7 +101,7 @@ namespace WSServer
                         //ConnectStreamingAPI();
                     }
                     Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-                    Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " connected");
+					Debug.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " connected");
                     ConnectedIds.Add(Context.ConnectionId);
 					LastConnection=new Tuple<string, DateTime> (Context.ConnectionId, DateTime.UtcNow );
 
@@ -119,7 +118,7 @@ namespace WSServer
             {
                 object ipAddress;
                 Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-                Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " reconnected");
+				Debug.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " reconnected");
                 ConnectedIds.Add(Context.ConnectionId);
 				LastReConnection = new Tuple<string, DateTime>(Context.ConnectionId, DateTime.UtcNow);
 				return base.OnReconnected();
@@ -130,11 +129,11 @@ namespace WSServer
                 {
                     object ipAddress;
                     Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-                    Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " disconnected");
+					Debug.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " disconnected");
 				}
 				catch (Exception)
                 {
-                    Console.WriteLine(Context.ConnectionId + " disconnected");
+					Debug.WriteLine(Context.ConnectionId + " disconnected");
                 }
                 ConnectedIds.Remove(Context.ConnectionId);
 				LastDisConnection = new Tuple<string, DateTime>(Context.ConnectionId, DateTime.UtcNow);
@@ -145,20 +144,11 @@ namespace WSServer
                 }
                 return base.OnDisconnected(stopCalled);
             }
-            public void Send(string message)
-            {
-                Clients.All.Message(message);
-            }
             // Add public static accessor
             public static StreamingAPI GetStreamingAPI()
             {
                 return streamingAPI;
             }
-            //public void SubscribeMarket(string marketid)
-            //{
-            //    Console.WriteLine(Context.ConnectionId + " subcribed to market " + marketid);
-            //    streamingAPI.SubscribeMarket(marketid);
-            //}
         }
     }
 
@@ -180,17 +170,14 @@ namespace WSServer
             {
                 return BadRequest("Streaming API not connected");
             }
-
-            //
-            Console.WriteLine($"subcribe to market {request.MarketId}");
-
+            Debug.WriteLine($"subcribe to market {request.MarketId}");
 			api.SubscribeMarket(request.MarketId);
             return Ok(new { subscribed = request.MarketId });
         }
 		[HttpGet]
 		public IHttpActionResult Capture()
 		{
-			Console.WriteLine("Capture endpoint hit", DateTime.UtcNow);
+			Debug.WriteLine("Capture endpoint hit", DateTime.UtcNow);
 			var api = Program.MyHub.GetStreamingAPI();
 
 			if (api == null)
@@ -223,7 +210,7 @@ namespace WSServer
 		[HttpGet]
 		public IHttpActionResult Status()
 		{
-			Console.WriteLine("Status endpoint hit", DateTime.UtcNow);
+			Debug.WriteLine("Status endpoint hit", DateTime.UtcNow);
 			var api = Program.MyHub.GetStreamingAPI();
 
 			if (api == null)
@@ -236,7 +223,7 @@ namespace WSServer
 		[HttpPost]
 		public IHttpActionResult Stop()
 		{
-			Console.WriteLine("Stop endpoint hit!");
+			Debug.WriteLine("Stop endpoint hit!");
 
 			var api = Program.MyHub.GetStreamingAPI();
 
@@ -252,7 +239,7 @@ namespace WSServer
 		[HttpPost]
         public IHttpActionResult Echo([FromBody] EchoRequest req)
         {
-            Console.WriteLine("Echo endpoint hit!");
+			Debug.WriteLine("Echo endpoint hit!");
             return Ok(new { message = $"echo received {req.Text}", time = DateTime.Now });
         }
     }

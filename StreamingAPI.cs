@@ -32,16 +32,15 @@ namespace WSServer
 			Debug.WriteLine("StreamingAPI ctor");
 
 			var savedListeners = Trace.Listeners.Cast<TraceListener>().ToList();
-			//Trace.Listeners.Clear();
+			Trace.Listeners.Clear();
 			Debug.WriteLine("NewSessionProvider");
 			NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
 
 			Debug.WriteLine("ClientCache.Start()");
-			ClientCache.Start();     // Connect WebSocket
-			SubscribeOrders();         // Optional
+			ClientCache.Start();		// Connect WebSocket
+			SubscribeOrders();         
 			SubscribeMarket("1.251469597");
 
-			//NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
 			ClientCache.Client.ConnectionStatusChanged += (o, e) =>
 			{
 				if (!String.IsNullOrEmpty(e.ConnectionId))
@@ -52,7 +51,7 @@ namespace WSServer
 			// Restore Trace listeners
 			foreach (var listener in savedListeners)
 			{
-				//Trace.Listeners.Add(listener);
+				Trace.Listeners.Add(listener);
 			}
 		}
 		public void NewSessionProvider(string ssohost, string appkey, string username, string password, string cert, string cert_password)
