@@ -18,15 +18,22 @@ namespace WSServer
     class Program
     {
         static IDisposable SignalR;
+        static StreamingAPI streamingAPI;
 
-        static void Main(string[] args)
+		static void Main(string[] args)
         {
 			string url = "http://88.202.230.157:8088";
 			url = "http://127.0.0.1:8088";
             url = "http://*:8088";
 
             SignalR = WebApp.Start<Startup>(url);
-            Console.WriteLine("Waiting for connections on:  " + url);
+
+			Debug.WriteLine("Program Main");
+			Settings settings = Settings.DeSerialize();
+			streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password, settings.Cert, settings.CertPassword);
+
+
+			Console.WriteLine("Waiting for connections on:  " + url);
             Console.ReadKey();
         }
 
@@ -58,27 +65,41 @@ namespace WSServer
 			public static Tuple<String, DateTime> LastConnection;
 			public static Tuple<String, DateTime> LastReConnection;
 			public static Tuple<String, DateTime> LastDisConnection;
-            private static StreamingAPI streamingAPI = null;
+            private static StreamingAPI streamingAPI;
+
+            public MyHub()
+            {
+				Debug.WriteLine("Hub ctor");
+				ConnectStreamingAPI();
+			}
             private void ConnectStreamingAPI()
             {
-                Settings settings = Settings.DeSerialize();
-                streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password, settings.Cert, settings.CertPassword);
-                streamingAPI.OrdersCallback += (String json1, String json2, String json3) =>
-                {
-                    //Debug.WriteLine("OrdersCallback");
-                    Clients.All.ordersChanged(json1, json2, json3);
-                };
-                streamingAPI.SubscribeOrders();
-            }
-            public override Task OnConnected()
+				Debug.WriteLine("Hub ConnectStreamingAPI");
+				Settings settings = Settings.DeSerialize();
+                streamingAPI = Program.streamingAPI;// new StreamingAPI(settings.AppID, settings.Account, settings.Password, settings.Cert, settings.CertPassword);
+				streamingAPI.OrdersCallback += (String json1, String json2, String json3) =>
+				{
+					//Debug.WriteLine("Hub OrdersCallback");
+					Clients.All.ordersChanged(json1, json2, json3);
+				};
+				Debug.WriteLine("Setting MarktCallback");
+				streamingAPI.MarketCallback += (String json1, String json2, String json3) =>
+				{
+					Debug.WriteLine($"Hub MarktCallback: {json1}");
+					Clients.All.marketChanged(json1, json2, json3);
+				};
+				//streamingAPI.SubscribeOrders();
+			}
+			public override Task OnConnected()
             {
-                try
-                {
+				Debug.WriteLine("OnConnected");
+				try
+				{
                     object ipAddress;
 
                     if (streamingAPI == null)
                     {
-                        ConnectStreamingAPI();
+                        //ConnectStreamingAPI();
                     }
                     Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
                     Console.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " connected");

@@ -19,33 +19,27 @@ namespace WSServer
 		public StreamUpdateDelegate MarketCallback = null;
 		public DateTime LastIncomingMessageTime;
 		public OrderMarketChangedEventArgs LastIncomingMessage;
-		public OrderMarketChangedEventArgs LastOutgoingMessage;
 		private static String ConnectionId { get; set; }
 		private static String MarketId { get; set; }
 		private static AppKeyAndSessionProvider SessionProvider { get; set; }
 		private static ClientCache _clientCache;
 		private static string _host = "stream-api.betfair.com";
-//		private static string _host = "stream-api-integration.betfair.com";
 		
 		private static int _port = 443;
 
 		public StreamingAPI(String AppKey, String BFUser, String BFPassword, string cert, string cert_password)
 		{
-			Console.WriteLine("StreamingAPI ctor");
+			Debug.WriteLine("StreamingAPI ctor");
 
-			// Save and clear ONLY Trace listeners
 			var savedListeners = Trace.Listeners.Cast<TraceListener>().ToList();
-			Trace.Listeners.Clear();
-
-			// Betfair login
+			//Trace.Listeners.Clear();
+			Debug.WriteLine("NewSessionProvider");
 			NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
 
-			// Restore Trace listeners
-			foreach (var listener in savedListeners)
-			{
-				//Trace.Listeners.Add(listener);
-			}
-
+			Debug.WriteLine("ClientCache.Start()");
+			ClientCache.Start();     // Connect WebSocket
+			SubscribeOrders();         // Optional
+			SubscribeMarket("1.251469597");
 
 			//NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
 			ClientCache.Client.ConnectionStatusChanged += (o, e) =>
@@ -55,6 +49,11 @@ namespace WSServer
 					ConnectionId = e.ConnectionId;
 				}
 			};
+			// Restore Trace listeners
+			foreach (var listener in savedListeners)
+			{
+				//Trace.Listeners.Add(listener);
+			}
 		}
 		public void NewSessionProvider(string ssohost, string appkey, string username, string password, string cert, string cert_password)
 		{
@@ -80,8 +79,7 @@ namespace WSServer
 		{
 			try
 			{
-				Debug.WriteLine($"OnMarketChanged");
-				MarketCallback?.Invoke(e.Change.ToJson(), "", "");
+				MarketCallback?.Invoke(JsonConvert.SerializeObject(e.Change), JsonConvert.SerializeObject(e.Market), JsonConvert.SerializeObject(e.Snap));
 			}
 			catch (Exception xe)
 			{
@@ -103,7 +101,7 @@ namespace WSServer
 		}
 		public void SubscribeMarket(String marketID)
 		{
-			Console.WriteLine("Start " + MarketId);
+			Debug.WriteLine("SubscribeMarket " + MarketId);
 			MarketFilter f = new MarketFilter()
 			{
 				BettingTypes = new List<MarketFilter.BettingTypesEnum?>() { MarketFilter.BettingTypesEnum.Odds },
