@@ -32,7 +32,6 @@ namespace WSServer
 			Settings settings = Settings.DeSerialize();
 			streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password, settings.Cert, settings.CertPassword);
 
-
 			Debug.WriteLine("Waiting for connections on:  " + url);
             Console.ReadKey();
         }
@@ -77,17 +76,17 @@ namespace WSServer
 				Debug.WriteLine("Hub ConnectStreamingAPI");
 				Settings settings = Settings.DeSerialize();
                 streamingAPI = Program.streamingAPI;
-				streamingAPI.OrdersCallback += (String json1, String json2, String json3) =>
+				streamingAPI.OrdersCallback = (String json1, String json2, String json3) =>				
 				{
 					//Debug.WriteLine("Hub OrdersCallback");
 					Clients.All.ordersChanged(json1, json2, json3);
 				};
-				Debug.WriteLine("Setting MarktCallback");
-				streamingAPI.MarketCallback += (String json1, String json2, String json3) =>
-				{
-					//Debug.WriteLine($"Hub MarktCallback: {json1}");
-					Clients.All.marketChanged(json1, json2, json3);
-				};
+				//Debug.WriteLine("Setting MarktCallback");
+				//streamingAPI.MarketCallback += (String json1, String json2, String json3) =>
+				//{
+				//	//Debug.WriteLine($"Hub MarktCallback: {json1}");
+				//	Clients.All.marketChanged(json1, json2, json3);
+				//};
 			}
 			public override Task OnConnected()
             {

@@ -87,11 +87,13 @@ namespace WSServer
 		}
 		private void OnOrderChanged(object sender, OrderMarketChangedEventArgs e)
 		{
+			//Debug.WriteLine("StreamingAPI OnOrderChanged");
 			try
 			{
 				LastIncomingMessage = e;
 				LastIncomingMessageTime = DateTime.UtcNow;
-				OrdersCallback( JsonConvert.SerializeObject(e.Change), JsonConvert.SerializeObject(e.OrderMarket), JsonConvert.SerializeObject(e.Snap)); 
+				//OrdersCallback(JsonConvert.SerializeObject(e.Change), JsonConvert.SerializeObject(e.OrderMarket), JsonConvert.SerializeObject(e.Snap));
+				OrdersCallback( JsonConvert.SerializeObject(e.Change), null, JsonConvert.SerializeObject(e.Snap)); 
 			}
 			catch (Exception xe)
 			{
