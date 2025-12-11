@@ -50,7 +50,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Betfair.ESAClient">
+    <Reference Include="Betfair.ESAClient, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\Betfair.ESAClient\bin\Debug\Betfair.ESAClient.dll</HintPath>
     </Reference>
     <Reference Include="Betfair.ESASwagger">

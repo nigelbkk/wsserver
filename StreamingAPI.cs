@@ -29,14 +29,10 @@ namespace WSServer
 
 		public StreamingAPI(String AppKey, String BFUser, String BFPassword, string cert, string cert_password)
 		{
-			Debug.WriteLine("StreamingAPI ctor");
-
 			var savedListeners = Trace.Listeners.Cast<TraceListener>().ToList();
 			Trace.Listeners.Clear();
-			Debug.WriteLine("NewSessionProvider");
 			NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
 
-			Debug.WriteLine("ClientCache.Start()");
 			ClientCache.Start();		// Connect WebSocket
 			SubscribeOrders();         
 			SubscribeMarket("1.251469597");

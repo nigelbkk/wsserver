@@ -28,7 +28,6 @@ namespace WSServer
 
             SignalR = WebApp.Start<Startup>(url);
 
-			Debug.WriteLine("Program Main");
 			Settings settings = Settings.DeSerialize();
 			streamingAPI = new StreamingAPI(settings.AppID, settings.Account, settings.Password, settings.Cert, settings.CertPassword);
 
@@ -40,21 +39,11 @@ namespace WSServer
         {
             public void Configuration(IAppBuilder app)
             {
-				Debug.WriteLine("Startup.Configuration called!");
                 HttpConfiguration config = new HttpConfiguration();
-
-                config.MapHttpAttributeRoutes();
+				config.MapHttpAttributeRoutes();
                 config.Routes.MapHttpRoute( name: "DefaultApi", routeTemplate: "api/{controller}/{action}/{id}", defaults: new { id = RouteParameter.Optional } );
-
-				// Simpler way to check controllers
-				//var controllerSelector = config.Services.GetService(typeof(System.Web.Http.Dispatcher.IHttpControllerSelector));
-				//Debug.WriteLine($"Controller selector: {controllerSelector?.GetType().Name}");
-
 				app.UseWebApi(config);
-				//Debug.WriteLine("Web API configured");
-
 				app.MapSignalR();
-				//Debug.WriteLine("SignalR mapped");
 			}
 		}
         [HubName("WebSocketsHub")]
@@ -68,12 +57,10 @@ namespace WSServer
 
             public MyHub()
             {
-				Debug.WriteLine("Hub ctor");
 				ConnectStreamingAPI();
 			}
             private void ConnectStreamingAPI()
             {
-				Debug.WriteLine("Hub ConnectStreamingAPI");
 				Settings settings = Settings.DeSerialize();
                 streamingAPI = Program.streamingAPI;
 				streamingAPI.OrdersCallback = (String json1, String json2, String json3) =>				
@@ -81,12 +68,11 @@ namespace WSServer
 					//Debug.WriteLine("Hub OrdersCallback");
 					Clients.All.ordersChanged(json1, json2, json3);
 				};
-				//Debug.WriteLine("Setting MarktCallback");
-				//streamingAPI.MarketCallback += (String json1, String json2, String json3) =>
-				//{
-				//	//Debug.WriteLine($"Hub MarktCallback: {json1}");
-				//	Clients.All.marketChanged(json1, json2, json3);
-				//};
+				streamingAPI.MarketCallback += (String json1, String json2, String json3) =>
+				{
+					//Debug.WriteLine($"Hub MarktCallback: {json1}");
+					Clients.All.marketChanged(json1, json2, json3);
+				};
 			}
 			public override Task OnConnected()
             {
@@ -136,11 +122,6 @@ namespace WSServer
                 }
                 ConnectedIds.Remove(Context.ConnectionId);
 				LastDisConnection = new Tuple<string, DateTime>(Context.ConnectionId, DateTime.UtcNow);
-
-				if (ConnectedIds.Count == 0)
-                {
-//                    streamingAPI = null;
-                }
                 return base.OnDisconnected(stopCalled);
             }
             // Add public static accessor
