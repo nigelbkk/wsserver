@@ -145,11 +145,9 @@ namespace WSServer
         public IHttpActionResult SubscribeMarket([FromBody] MarketSubscribeRequest request)
         {
             var api = Program.MyHub.GetStreamingAPI();
-
             if (api == null)
-            {
                 return BadRequest("Streaming API not connected");
-            }
+            
             Debug.WriteLine($"subcribe to market {request.MarketId}");
 			api.SubscribeMarket(request.MarketId);
             return Ok(new { subscribed = request.MarketId });
@@ -157,22 +155,19 @@ namespace WSServer
 		[HttpGet]
 		public IHttpActionResult Capture()
 		{
-			Debug.WriteLine("Capture endpoint hit", DateTime.UtcNow);
 			var api = Program.MyHub.GetStreamingAPI();
-
 			if (api == null)
-			{
 				return BadRequest("Streaming API not connected");
-			}
-			return Ok(new { 
+			
+            return Ok(new { 
                 status = "running", 
                 time = DateTime.UtcNow,
 				LastIncomingMessageTime = api.LastIncomingMessageTime,
 				LastConnection = Program.MyHub.LastConnection,
 				LastDisConnection = Program.MyHub.LastDisConnection,
 				LastReConnection = Program.MyHub.LastReConnection,
-                Program.MyHub.ConnectedIds,
-				LastIncomingMessage = api.LastIncomingMessage
+                Program.MyHub.ConnectedIds
+				//LastIncomingMessage = api.LastIncomingMessage
             });
 		}
 	}
@@ -185,42 +180,13 @@ namespace WSServer
             public int Count { get; set; }
         }
 
-
-		// GET api/test/status
 		[HttpGet]
 		public IHttpActionResult Status()
 		{
-			Debug.WriteLine("Status endpoint hit", DateTime.UtcNow);
 			var api = Program.MyHub.GetStreamingAPI();
-
 			if (api == null)
-			{
 				return BadRequest("Streaming API not connected");
-			}
 			return Ok(new { status = "running", time = DateTime.Now, } );
 		}
-
-		[HttpPost]
-		public IHttpActionResult Stop()
-		{
-			Debug.WriteLine("Stop endpoint hit!");
-
-			var api = Program.MyHub.GetStreamingAPI();
-
-			if (api == null)
-			{
-				return BadRequest("Streaming API not connected");
-			}
-            api.Stop();
-			return Ok("Server stopped");
-		}
-
-		// POST api/test/echo
-		[HttpPost]
-        public IHttpActionResult Echo([FromBody] EchoRequest req)
-        {
-			Debug.WriteLine("Echo endpoint hit!");
-            return Ok(new { message = $"echo received {req.Text}", time = DateTime.Now });
-        }
     }
 }
