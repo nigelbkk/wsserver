@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNet.SignalR;
+﻿using Betfair.ESASwagger.Model;
+using Microsoft.AspNet.SignalR;
 using Microsoft.AspNet.SignalR.Hubs;
 using Microsoft.Owin;
 using Microsoft.Owin.Hosting;
@@ -15,6 +16,8 @@ using WSServer;
 [assembly: OwinStartup(typeof(Program.Startup))]
 namespace WSServer
 {
+
+
     class Program
     {
         static IDisposable SignalR;
@@ -68,10 +71,10 @@ namespace WSServer
 					//Debug.WriteLine("Hub OrdersCallback");
 					Clients.All.ordersChanged(json1, json2, json3);
 				};
-				streamingAPI.MarketCallback += (String json1, String json2, String json3) =>
+				streamingAPI.MarketCallback += (MarketChange mc, MarketSnapDto snap) =>
 				{
-					//Debug.WriteLine($"Hub MarktCallback: {json1}");
-					Clients.All.marketChanged(json1, json2, json3);
+					Debug.WriteLine($"Hub MarktCallback:");
+					Clients.All.marketChanged(mc, snap);
 				};
 			}
 			public override Task OnConnected()

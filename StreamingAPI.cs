@@ -1,22 +1,49 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Betfair.ESAClient;
+﻿using Betfair.ESAClient;
 using Betfair.ESAClient.Auth;
 using Betfair.ESAClient.Cache;
 using Betfair.ESASwagger.Model;
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using static Betfair.ESASwagger.Model.MarketDataFilter;
 
 namespace WSServer
 {
-	public delegate void StreamUpdateDelegate(string json1, string json2, string json3);
+    public class MarketSnapDto
+    {
+        public bool InPlay { get; set; }
+        public DateTime Time { get; set; }
+        public List<MarketRunnerSnapDto> Runners { get; set; }
+    }
+    public class MarketRunnerSnapDto
+    {
+        public long SelectionId { get; set; }
+        public MarketRunnerPricesDto Prices { get; set; }
+    }
+    public class MarketRunnerPricesDto
+    {
+        public List<PriceDto> Back { get; set; }
+        public List<PriceDto> Lay { get; set; }
+    }
+    public class PriceDto
+    {
+        public double Price { get; set; }
+        public double Size { get; set; }
+    }
+
+
+
+
+    public delegate void OrdersUpdateDelegate(string json1, string json2, string json3);
+    public delegate void MarketUpdateDelegate(MarketChange mc, MarketSnapDto snap);
 	class StreamingAPI
 	{
-		public StreamUpdateDelegate OrdersCallback = null;
-		public StreamUpdateDelegate MarketCallback = null;
+		public OrdersUpdateDelegate OrdersCallback = null;
+		public MarketUpdateDelegate MarketCallback = null;
 		public DateTime LastIncomingMessageTime;
 		public OrderMarketChangedEventArgs LastIncomingMessage;
 		private static String ConnectionId { get; set; }
@@ -72,9 +99,52 @@ namespace WSServer
 		}
 		private void OnMarketChanged(object sender, MarketChangedEventArgs e)
 		{
+			Debug.WriteLine("StreamingAPI OnMarketChanged");
 			try
-			{
-				MarketCallback?.Invoke(JsonConvert.SerializeObject(e.Change), JsonConvert.SerializeObject(e.Market), JsonConvert.SerializeObject(e.Snap));
+            {
+                var runnerList = new List<MarketRunnerSnapDto>();
+
+                foreach (var r in e.Snap.MarketRunners)
+                {
+                    var backList = new List<PriceDto>();
+                    if (r.Prices.BestAvailableToBack != null)
+                    {
+                        foreach (var p in r.Prices.BestAvailableToBack)
+                        {
+                            backList.Add(new PriceDto { Price = p.Price, Size = p.Size });
+                        }
+                    }
+
+                    var layList = new List<PriceDto>();
+                    if (r.Prices.BestAvailableToLay != null)
+                    {
+                        foreach (var p in r.Prices.BestAvailableToLay)
+                        {
+                            layList.Add(new PriceDto { Price = p.Price, Size = p.Size });
+                        }
+                    }
+
+                    var dto = new MarketRunnerSnapDto
+                    {
+                        SelectionId = r.RunnerId.SelectionId,
+                        Prices = new MarketRunnerPricesDto
+                        {
+                            Back = backList,
+                            Lay = layList
+                        }
+                    };
+
+                    runnerList.Add(dto);
+                }
+
+				MarketSnapDto snap = new MarketSnapDto()
+				{
+                    InPlay = e.Snap.MarketDefinition?.InPlay ?? false,
+                    Time = e.Snap.Time,
+                    Runners = runnerList
+				};
+
+                MarketCallback?.Invoke(e.Change, snap);
 			}
 			catch (Exception xe)
 			{
@@ -96,30 +166,25 @@ namespace WSServer
 				Debug.WriteLine($"{xe.Message}");
 			}
 		}
-		public void SubscribeMarket(String marketID)
+		public void SubscribeMarket(String marketId)
 		{
 			Debug.WriteLine("SubscribeMarket " + MarketId);
-			MarketFilter f = new MarketFilter()
-			{
-				BettingTypes = new List<MarketFilter.BettingTypesEnum?>() { MarketFilter.BettingTypesEnum.Odds },
-				MarketIds = new List<string>() { marketID }
-			};
+            MarketSubscriptionMessage msm = new MarketSubscriptionMessage
+            {
+                Op = "marketSubscription",
+                Id = 1,
+                MarketFilter = new MarketFilter
+                {
+                    MarketIds = new List<string> { marketId }  // your string variable
+                },
+                MarketDataFilter = new MarketDataFilter
+                {
+                    Fields = new List<FieldsEnum?> { FieldsEnum.ExBestOffers, FieldsEnum.ExLtp, FieldsEnum.ExMarketDef, FieldsEnum.ExTraded },
+                    LadderLevels = 3
+                }
+            };
 
-			MarketDataFilter mdf = new MarketDataFilter();
-			mdf.LadderLevels = 3;
-			mdf.Fields = new List<MarketDataFilter.FieldsEnum?>();
-			mdf.Fields.Add(MarketDataFilter.FieldsEnum.ExBestOffers);
-			mdf.Fields.Add(MarketDataFilter.FieldsEnum.ExTradedVol);
-			mdf.Fields.Add(MarketDataFilter.FieldsEnum.ExLtp);
-			mdf.Fields.Add(MarketDataFilter.FieldsEnum.ExMarketDef);
-
-			MarketSubscriptionMessage msm = new MarketSubscriptionMessage()
-			{
-				MarketDataFilter = mdf,
-				MarketFilter = f,
-				SegmentationEnabled = true
-			};
-			ClientCache.SubscribeMarkets(msm);
+            ClientCache.SubscribeMarkets(msm);
 		}
 		public void SubscribeOrders()
 		{ 
