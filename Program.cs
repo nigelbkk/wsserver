@@ -16,13 +16,10 @@ using WSServer;
 [assembly: OwinStartup(typeof(Program.Startup))]
 namespace WSServer
 {
-
-
     class Program
     {
         static IDisposable SignalR;
         static StreamingAPI streamingAPI;
-
 		static void Main(string[] args)
         {
 			string url = "http://88.202.230.157:8088";
@@ -57,7 +54,6 @@ namespace WSServer
 			public static Tuple<String, DateTime> LastReConnection;
 			public static Tuple<String, DateTime> LastDisConnection;
             private static StreamingAPI streamingAPI;
-
             public MyHub()
             {
 				ConnectStreamingAPI();
@@ -68,14 +64,28 @@ namespace WSServer
                 streamingAPI = Program.streamingAPI;
 				streamingAPI.OrdersCallback = (String json1, String json2, String json3) =>				
 				{
-					//Debug.WriteLine("Hub OrdersCallback");
-					Clients.All.ordersChanged(json1, json2, json3);
+                    //Debug.WriteLine("Hub OrdersCallback");
+                    try
+                    {
+                        Clients.All.ordersChanged(json1, json2, json3);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
 				};
-				streamingAPI.MarketCallback += (MarketChange mc, MarketSnapDto snap) =>
+				streamingAPI.MarketCallback += (MarketChangeDto change) =>
 				{
-					Debug.WriteLine($"Hub MarktCallback:");
-					Clients.All.marketChanged(mc, snap);
-				};
+					//Debug.WriteLine($"Hub MarktCallback:");
+                    try
+                    {
+				    	Clients.All.marketChanged(change);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                };
 			}
 			public override Task OnConnected()
             {
@@ -98,7 +108,7 @@ namespace WSServer
 				catch (Exception ex)
 				{
 					Debug.WriteLine($"OnConnected ERROR: {ex.Message}");
-					Debug.WriteLine($"Stack: {ex.StackTrace}");
+					//Debug.WriteLine($"Stack: {ex.StackTrace}");
 					throw; // Re-throw so you see it in logs
 				}
 			}

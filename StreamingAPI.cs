@@ -3,6 +3,7 @@ using Betfair.ESAClient.Auth;
 using Betfair.ESAClient.Cache;
 using Betfair.ESASwagger.Model;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,10 +14,34 @@ using static Betfair.ESASwagger.Model.MarketDataFilter;
 
 namespace WSServer
 {
+    public class MarketChangeDto
+    {
+        public string MarketId { get; set; }
+        public List<RunnerChangeDto> Runners { get; set; }
+    }
+
+    public class RunnerChangeDto
+    {
+        public long Id { get; set; }
+        public double? Ltp { get; set; }
+        public double? Tv { get; set; }
+
+        public List<PriceLevelDto> Batb { get; set; }
+        public List<PriceLevelDto> Batl { get; set; }
+    }
+
+    public class PriceLevelDto
+    {
+        public int Level { get; set; }
+        public double Price { get; set; }
+        public double Size { get; set; }
+    }
     public class MarketSnapDto
     {
+        public String MarketId { get; set; }
         public bool InPlay { get; set; }
         public DateTime Time { get; set; }
+		public MarketDefinition.StatusEnum? Status { get; set; }
         public List<MarketRunnerSnapDto> Runners { get; set; }
     }
     public class MarketRunnerSnapDto
@@ -35,11 +60,9 @@ namespace WSServer
         public double Size { get; set; }
     }
 
-
-
-
     public delegate void OrdersUpdateDelegate(string json1, string json2, string json3);
-    public delegate void MarketUpdateDelegate(MarketChange mc, MarketSnapDto snap);
+    //public delegate void MarketUpdateDelegate(MarketSnapDto snap);
+    public delegate void MarketUpdateDelegate(MarketChangeDto change);
 	class StreamingAPI
 	{
 		public OrdersUpdateDelegate OrdersCallback = null;
@@ -51,9 +74,7 @@ namespace WSServer
 		private static AppKeyAndSessionProvider SessionProvider { get; set; }
 		private static ClientCache _clientCache;
 		private static string _host = "stream-api.betfair.com";
-		
 		private static int _port = 443;
-
 		public StreamingAPI(String AppKey, String BFUser, String BFPassword, string cert, string cert_password)
 		{
 			var savedListeners = Trace.Listeners.Cast<TraceListener>().ToList();
@@ -62,7 +83,6 @@ namespace WSServer
 
 			ClientCache.Start();		// Connect WebSocket
 			SubscribeOrders();         
-			SubscribeMarket("1.251469597");
 
 			ClientCache.Client.ConnectionStatusChanged += (o, e) =>
 			{
@@ -97,10 +117,80 @@ namespace WSServer
 				return _clientCache;
 			}
 		}
-		private void OnMarketChanged(object sender, MarketChangedEventArgs e)
-		{
-			Debug.WriteLine("StreamingAPI OnMarketChanged");
-			try
+        public static MarketChangeDto BuildMarketChangeDto(
+            string marketId,
+            MarketChange change)
+        {
+            var dto = new MarketChangeDto
+            {
+                MarketId = marketId,
+                Runners = new List<RunnerChangeDto>()
+            };
+
+            var json = JObject.Parse(change.ToJson());
+            var rcArray = json["rc"] as JArray;
+
+            if (rcArray == null)
+                return dto;
+
+            foreach (var rc in rcArray)
+            {
+                var runner = new RunnerChangeDto
+                {
+                    Id = rc["id"] != null ? rc["id"].Value<long>() : 0,
+                    Ltp = rc["ltp"]?.Value<double?>(),
+                    Tv = rc["tv"]?.Value<double?>(),
+                    Batb = new List<PriceLevelDto>(),
+                    Batl = new List<PriceLevelDto>()
+                };
+
+                // batb
+                var batbArray = rc["batb"] as JArray;
+                if (batbArray != null)
+                {
+                    foreach (var level in batbArray)
+                    {
+                        runner.Batb.Add(new PriceLevelDto
+                        {
+                            Level = level[0].Value<int>(),
+                            Price = level[1].Value<double>(),
+                            Size = level[2].Value<double>()
+                        });
+                    }
+                }
+
+                // batl
+                var batlArray = rc["batl"] as JArray;
+                if (batlArray != null)
+                {
+                    foreach (var level in batlArray)
+                    {
+                        runner.Batl.Add(new PriceLevelDto
+                        {
+                            Level = level[0].Value<int>(),
+                            Price = level[1].Value<double>(),
+                            Size = level[2].Value<double>()
+                        });
+                    }
+                }
+
+                dto.Runners.Add(runner);
+            }
+
+            return dto;
+        }
+
+        private void OnMarketChanged(object sender, MarketChangedEventArgs e)
+        {
+            String json = e.Change.ToJson();
+			MarketChangeDto changeDto = BuildMarketChangeDto(e.Change.Id, e.Change);
+
+            MarketCallback?.Invoke(changeDto);
+        }
+        private void OnMarketChangedOld(object sender, MarketChangedEventArgs e)
+        {
+            //Debug.WriteLine("StreamingAPI OnMarketChanged");
+            try
             {
                 var runnerList = new List<MarketRunnerSnapDto>();
 
@@ -139,12 +229,14 @@ namespace WSServer
 
 				MarketSnapDto snap = new MarketSnapDto()
 				{
+                    MarketId = e.Snap.MarketId,
                     InPlay = e.Snap.MarketDefinition?.InPlay ?? false,
+                    Status = e.Snap.MarketDefinition?.Status ??	null,
                     Time = e.Snap.Time,
                     Runners = runnerList
 				};
 
-                MarketCallback?.Invoke(e.Change, snap);
+                //MarketCallback?.Invoke(snap);
 			}
 			catch (Exception xe)
 			{
@@ -153,40 +245,44 @@ namespace WSServer
 		}
 		private void OnOrderChanged(object sender, OrderMarketChangedEventArgs e)
 		{
-			//Debug.WriteLine("StreamingAPI OnOrderChanged");
-			try
-			{
+            //Debug.WriteLine("StreamingAPI OnOrderChanged");
+            try
+            {
 				LastIncomingMessage = e;
 				LastIncomingMessageTime = DateTime.UtcNow;
-				//OrdersCallback(JsonConvert.SerializeObject(e.Change), JsonConvert.SerializeObject(e.OrderMarket), JsonConvert.SerializeObject(e.Snap));
-				OrdersCallback( JsonConvert.SerializeObject(e.Change), null, JsonConvert.SerializeObject(e.Snap)); 
+				if (OrdersCallback != null)
+					OrdersCallback( JsonConvert.SerializeObject(e.Change), null, JsonConvert.SerializeObject(e.Snap)); 
 			}
 			catch (Exception xe)
 			{
 				Debug.WriteLine($"{xe.Message}");
 			}
 		}
+		int? subscription_count = 0;
+		private HashSet<String> _subscriptions = new HashSet<string>();
 		public void SubscribeMarket(String marketId)
 		{
 			Debug.WriteLine("SubscribeMarket " + MarketId);
-            MarketSubscriptionMessage msm = new MarketSubscriptionMessage
-            {
-                Op = "marketSubscription",
-                Id = 1,
-                MarketFilter = new MarketFilter
-                {
-                    MarketIds = new List<string> { marketId }  // your string variable
-                },
-                MarketDataFilter = new MarketDataFilter
-                {
-                    Fields = new List<FieldsEnum?> { FieldsEnum.ExBestOffers, FieldsEnum.ExLtp, FieldsEnum.ExMarketDef, FieldsEnum.ExTraded },
-                    LadderLevels = 3
-                }
-            };
+            _subscriptions.Add(marketId);
 
+            MarketSubscriptionMessage msm = new MarketSubscriptionMessage
+			{
+				Op = "marketSubscription",
+				Id = subscription_count++,
+
+				MarketFilter = new MarketFilter
+				{
+					MarketIds = _subscriptions.ToList()
+				},
+				MarketDataFilter = new MarketDataFilter
+				{
+					Fields = new List<FieldsEnum?> { FieldsEnum.ExBestOffers, FieldsEnum.ExLtp, FieldsEnum.ExMarketDef, FieldsEnum.ExTraded },
+					LadderLevels = 3
+				}
+			};
             ClientCache.SubscribeMarkets(msm);
-		}
-		public void SubscribeOrders()
+        }
+        public void SubscribeOrders()
 		{ 
 			OrderSubscriptionMessage osm = new OrderSubscriptionMessage()
 			{
