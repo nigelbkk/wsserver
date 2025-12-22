@@ -17,7 +17,8 @@ namespace WSServer
     public class MarketChangeDto
     {
         public string MarketId { get; set; }
-        public List<RunnerChangeDto> Runners { get; set; }
+        public DateTime Time { get; set; }
+		public List<RunnerChangeDto> Runners { get; set; }
     }
 
     public class RunnerChangeDto
@@ -119,12 +120,13 @@ namespace WSServer
 				return _clientCache;
 			}
 		}
-        public static MarketChangeDto BuildMarketChangeDto( string marketId, MarketChange change) 
+        public static MarketChangeDto BuildMarketChangeDto(DateTime time, string marketId, MarketChange change) 
         {
             var dto = new MarketChangeDto
             {
                 MarketId = marketId,
-                Runners = new List<RunnerChangeDto>()
+                Runners = new List<RunnerChangeDto>(),
+                Time = time
             };
 
             var json = JObject.Parse(change.ToJson());
@@ -211,7 +213,9 @@ namespace WSServer
         private void OnMarketChanged(object sender, MarketChangedEventArgs e)
         {
             String json = e.Change.ToJson();
-			MarketChangeDto changeDto = BuildMarketChangeDto(e.Change.Id, e.Change);
+            DateTime Time = e.Snap.Time;
+
+			MarketChangeDto changeDto = BuildMarketChangeDto(e.Snap.Time, e.Change.Id, e.Change);
 
             MarketCallback?.Invoke(changeDto);
         }
