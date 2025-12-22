@@ -28,6 +28,8 @@ namespace WSServer
 
         public List<PriceLevelDto> Batb { get; set; }
         public List<PriceLevelDto> Batl { get; set; }
+        public List<PriceLevelDto> Bdatb { get; set; }
+        public List<PriceLevelDto> Bdatl { get; set; }
     }
 
     public class PriceLevelDto
@@ -117,9 +119,7 @@ namespace WSServer
 				return _clientCache;
 			}
 		}
-        public static MarketChangeDto BuildMarketChangeDto(
-            string marketId,
-            MarketChange change)
+        public static MarketChangeDto BuildMarketChangeDto( string marketId, MarketChange change) 
         {
             var dto = new MarketChangeDto
             {
@@ -141,7 +141,9 @@ namespace WSServer
                     Ltp = rc["ltp"]?.Value<double?>(),
                     Tv = rc["tv"]?.Value<double?>(),
                     Batb = new List<PriceLevelDto>(),
-                    Batl = new List<PriceLevelDto>()
+                    Batl = new List<PriceLevelDto>(),
+                    Bdatb = new List<PriceLevelDto>(),
+                    Bdatl = new List<PriceLevelDto>()
                 };
 
                 // batb
@@ -158,6 +160,19 @@ namespace WSServer
                         });
                     }
                 }
+                var bdatbArray = rc["bdatb"] as JArray;
+                if (bdatbArray != null)
+                {
+                    foreach (var level in bdatbArray)
+                    {
+                        runner.Bdatb.Add(new PriceLevelDto
+                        {
+                            Level = level[0].Value<int>(),
+                            Price = level[1].Value<double>(),
+                            Size = level[2].Value<double>()
+                        });
+                    }
+                }
 
                 // batl
                 var batlArray = rc["batl"] as JArray;
@@ -166,6 +181,19 @@ namespace WSServer
                     foreach (var level in batlArray)
                     {
                         runner.Batl.Add(new PriceLevelDto
+                        {
+                            Level = level[0].Value<int>(),
+                            Price = level[1].Value<double>(),
+                            Size = level[2].Value<double>()
+                        });
+                    }
+                }
+                var bdatlArray = rc["bdatl"] as JArray;
+                if (bdatlArray != null)
+                {
+                    foreach (var level in bdatlArray)
+                    {
+                        runner.Bdatl.Add(new PriceLevelDto
                         {
                             Level = level[0].Value<int>(),
                             Price = level[1].Value<double>(),
@@ -276,7 +304,7 @@ namespace WSServer
 				},
 				MarketDataFilter = new MarketDataFilter
 				{
-					Fields = new List<FieldsEnum?> { FieldsEnum.ExBestOffers, FieldsEnum.ExLtp, FieldsEnum.ExMarketDef, FieldsEnum.ExTraded },
+					Fields = new List<FieldsEnum?> { FieldsEnum.ExBestOffersDisp, FieldsEnum.ExLtp, FieldsEnum.ExMarketDef, FieldsEnum.ExTraded },
 					LadderLevels = 3
 				}
 			};
