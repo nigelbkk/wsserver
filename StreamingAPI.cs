@@ -127,7 +127,8 @@ namespace WSServer
             {
                 MarketId = marketId,
                 Runners = new List<RunnerChangeDto>(),
-                Time = time
+                Time = time,
+                Status = status
             };
 
             var json = JObject.Parse(change.ToJson());
