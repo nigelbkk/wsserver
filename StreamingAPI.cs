@@ -28,8 +28,7 @@ namespace WSServer
         public double? Ltp { get; set; }
         public double? Tv { get; set; }
 
-        public List<PriceLevelDto> Batb { get; set; }
-        public List<PriceLevelDto> Batl { get; set; }
+        public List<List<double?>> Trd { get; set; }
         public List<PriceLevelDto> Bdatb { get; set; }
         public List<PriceLevelDto> Bdatl { get; set; }
     }
@@ -144,26 +143,23 @@ namespace WSServer
                     Id = rc["id"] != null ? rc["id"].Value<long>() : 0,
                     Ltp = rc["ltp"]?.Value<double?>(),
                     Tv = rc["tv"]?.Value<double?>(),
-                    Batb = new List<PriceLevelDto>(),
-                    Batl = new List<PriceLevelDto>(),
                     Bdatb = new List<PriceLevelDto>(),
-                    Bdatl = new List<PriceLevelDto>()
+                    Bdatl = new List<PriceLevelDto>(),
+                    Trd = new List<List<double?>>(),
                 };
 
-                // batb
-                var batbArray = rc["batb"] as JArray;
-                if (batbArray != null)
+                var tradeArray = rc["trd"] as JArray;
+                if (tradeArray != null)
                 {
-                    foreach (var level in batbArray)
+                    foreach (var trade in tradeArray)
                     {
-                        runner.Batb.Add(new PriceLevelDto
-                        {
-                            Level = level[0].Value<int>(),
-                            Price = level[1].Value<double>(),
-                            Size = level[2].Value<double>()
-                        });
+                        double? price = trade[0].ToObject<double?>();
+                        double? volume = trade[1].ToObject<double?>();
+
+                        runner.Trd.Add(new List<double?> { price, volume });
                     }
                 }
+
                 var bdatbArray = rc["bdatb"] as JArray;
                 if (bdatbArray != null)
                 {
@@ -178,20 +174,6 @@ namespace WSServer
                     }
                 }
 
-                // batl
-                var batlArray = rc["batl"] as JArray;
-                if (batlArray != null)
-                {
-                    foreach (var level in batlArray)
-                    {
-                        runner.Batl.Add(new PriceLevelDto
-                        {
-                            Level = level[0].Value<int>(),
-                            Price = level[1].Value<double>(),
-                            Size = level[2].Value<double>()
-                        });
-                    }
-                }
                 var bdatlArray = rc["bdatl"] as JArray;
                 if (bdatlArray != null)
                 {
@@ -221,62 +203,6 @@ namespace WSServer
 
             MarketCallback?.Invoke(changeDto);
         }
-        private void OnMarketChangedOld(object sender, MarketChangedEventArgs e)
-        {
-            //Debug.WriteLine("StreamingAPI OnMarketChanged");
-            try
-            {
-                var runnerList = new List<MarketRunnerSnapDto>();
-
-                foreach (var r in e.Snap.MarketRunners)
-                {
-                    var backList = new List<PriceDto>();
-                    if (r.Prices.BestAvailableToBack != null)
-                    {
-                        foreach (var p in r.Prices.BestAvailableToBack)
-                        {
-                            backList.Add(new PriceDto { Price = p.Price, Size = p.Size });
-                        }
-                    }
-
-                    var layList = new List<PriceDto>();
-                    if (r.Prices.BestAvailableToLay != null)
-                    {
-                        foreach (var p in r.Prices.BestAvailableToLay)
-                        {
-                            layList.Add(new PriceDto { Price = p.Price, Size = p.Size });
-                        }
-                    }
-
-                    var dto = new MarketRunnerSnapDto
-                    {
-                        SelectionId = r.RunnerId.SelectionId,
-                        Prices = new MarketRunnerPricesDto
-                        {
-                            Back = backList,
-                            Lay = layList
-                        }
-                    };
-
-                    runnerList.Add(dto);
-                }
-
-				MarketSnapDto snap = new MarketSnapDto()
-				{
-                    MarketId = e.Snap.MarketId,
-                    InPlay = e.Snap.MarketDefinition?.InPlay ?? false,
-                    Status = e.Snap.MarketDefinition?.Status ??	null,
-                    Time = e.Snap.Time,
-                    Runners = runnerList
-				};
-
-                //MarketCallback?.Invoke(snap);
-			}
-			catch (Exception xe)
-			{
-				Debug.WriteLine(xe.Message);
-			}
-		}
 		private void OnOrderChanged(object sender, OrderMarketChangedEventArgs e)
 		{
             //Debug.WriteLine("StreamingAPI OnOrderChanged");
@@ -310,7 +236,7 @@ namespace WSServer
 				},
 				MarketDataFilter = new MarketDataFilter
 				{
-					Fields = new List<FieldsEnum?> { FieldsEnum.ExBestOffersDisp, FieldsEnum.ExLtp, FieldsEnum.ExMarketDef, FieldsEnum.ExTraded },
+					Fields = new List<FieldsEnum?> { FieldsEnum.ExBestOffersDisp, FieldsEnum.ExTraded, FieldsEnum.ExTradedVol, FieldsEnum.ExBestOffers, FieldsEnum.ExLtp, FieldsEnum.ExMarketDef },
 					LadderLevels = 3
 				}
 			};
