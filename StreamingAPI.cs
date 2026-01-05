@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web.UI.WebControls;
 using static Betfair.ESASwagger.Model.MarketDataFilter;
 
 namespace WSServer
@@ -18,6 +19,7 @@ namespace WSServer
     {
         public string MarketId { get; set; }
         public DateTime Time { get; set; }
+		public double? Tv { get; set; }
 		public MarketDefinition.StatusEnum? Status { get; set; }
 		public List<RunnerChangeDto> Runners { get; set; }
     }
@@ -127,7 +129,8 @@ namespace WSServer
                 MarketId = marketId,
                 Runners = new List<RunnerChangeDto>(),
                 Time = time,
-                Status = status
+				Tv = change.Tv,
+				Status = status
             };
 
             var json = JObject.Parse(change.ToJson());
