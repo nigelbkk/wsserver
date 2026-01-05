@@ -122,14 +122,14 @@ namespace WSServer
 				return _clientCache;
 			}
 		}
-        public static MarketChangeDto BuildMarketChangeDto(DateTime time, MarketDefinition.StatusEnum? status, string marketId, MarketChange change) 
+        public static MarketChangeDto BuildMarketChangeDto(DateTime time, double TradedVolume, MarketDefinition.StatusEnum? status, string marketId, MarketChange change) 
         {
             var dto = new MarketChangeDto
             {
                 MarketId = marketId,
                 Runners = new List<RunnerChangeDto>(),
                 Time = time,
-				Tv = change.Tv,
+				Tv = TradedVolume,
 				Status = status
             };
 
@@ -202,7 +202,7 @@ namespace WSServer
             String json = e.Change.ToJson();
             DateTime Time = e.Snap.Time;
 
-			MarketChangeDto changeDto = BuildMarketChangeDto(e.Snap.Time, e.Snap.MarketDefinition.Status, e.Change.Id, e.Change);
+			MarketChangeDto changeDto = BuildMarketChangeDto(e.Snap.Time, e.Snap.TradedVolume, e.Snap.MarketDefinition.Status, e.Change.Id, e.Change);
 
             MarketCallback?.Invoke(changeDto);
         }
