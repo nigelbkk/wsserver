@@ -1,14 +1,20 @@
-﻿using Betfair.ESASwagger.Model;
+﻿using Betfair.ESAClient;
+using Betfair.ESAClient.Cache;
 using Microsoft.AspNet.SignalR;
 using Microsoft.AspNet.SignalR.Hubs;
 using Microsoft.Owin;
 using Microsoft.Owin.Hosting;
 using Owin;
 using System;
+using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.InteropServices.WindowsRuntime;
+using System.Linq;
+using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Runtime.Remoting.Contexts;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http;
 using WSServer;
@@ -16,7 +22,7 @@ using WSServer;
 [assembly: OwinStartup(typeof(Program.Startup))]
 namespace WSServer
 {
-    class Program
+	class Program
     {
         static IDisposable SignalR;
         static StreamingAPI streamingAPI;
@@ -47,18 +53,65 @@ namespace WSServer
 			}
 		}
         [HubName("WebSocketsHub")]
-        public class MyHub : Hub
+        public class WebSocketsHub : Hub
         {
-            public static HashSet<string> ConnectedIds = new HashSet<string>();
-			public static Tuple<String, DateTime> LastConnection;
-			public static Tuple<String, DateTime> LastReConnection;
-			public static Tuple<String, DateTime> LastDisConnection;
-            private static StreamingAPI streamingAPI;
-            public MyHub()
+			class ClientConnection
+			{
+				public long Id { get; }
+				public WebSocket Socket { get; }
+
+				public ClientConnection(long id, WebSocket socket)
+				{
+					Id = id;
+					Socket = socket;
+				}
+			}
+			public static HashSet<string> ConnectedIds = new HashSet<string>();
+			private static ConcurrentDictionary<string, HashSet<string>> _subscriptions = new ConcurrentDictionary<string, HashSet<string>>();
+			private static StreamingAPI streamingAPI;
+			private static String _keepAliveMarket;
+
+			public WebSocketsHub()
             {
 				ConnectStreamingAPI();
 			}
-            private void ConnectStreamingAPI()
+
+			public static void SubscribeMarket(String connectionId, String marketId)
+			{
+				lock (_subscriptions)
+				{
+					if (!_subscriptions.TryGetValue(marketId, out var set))
+					{
+						set = new HashSet<string>();
+						_subscriptions[marketId] = set;
+
+						// first subscriber → subscribe upstream
+						streamingAPI.SubscribeMarket(marketId);
+						_keepAliveMarket = marketId;
+					}
+
+					set.Add(connectionId);
+				}
+			}
+			public static void UnSubscribeMarket(String connectionId, String marketId)
+			{
+				if (!_subscriptions.TryGetValue(marketId, out var set))
+					return;
+
+				set.Remove(connectionId);
+
+				if (set.Count == 0)
+				{
+					// IMPORTANT: only unsubscribe if this is NOT your "keep-alive" market
+					if (marketId != _keepAliveMarket)
+					{
+						streamingAPI.UnSubscribeMarket(marketId);
+						_subscriptions.TryRemove(marketId, out set);
+					}
+				}
+			}
+
+			private void ConnectStreamingAPI()
             {
 				Settings settings = Settings.DeSerialize();
                 streamingAPI = Program.streamingAPI;
@@ -101,8 +154,6 @@ namespace WSServer
                     Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
 					Debug.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " connected");
                     ConnectedIds.Add(Context.ConnectionId);
-					LastConnection=new Tuple<string, DateTime> (Context.ConnectionId, DateTime.UtcNow );
-
 					return base.OnConnected();
                 }
 				catch (Exception ex)
@@ -118,7 +169,6 @@ namespace WSServer
                 Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
 				Debug.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " reconnected");
                 ConnectedIds.Add(Context.ConnectionId);
-				LastReConnection = new Tuple<string, DateTime>(Context.ConnectionId, DateTime.UtcNow);
 				return base.OnReconnected();
             }
             public override Task OnDisconnected(bool stopCalled)
@@ -134,72 +184,39 @@ namespace WSServer
 					Debug.WriteLine(Context.ConnectionId + " disconnected");
                 }
                 ConnectedIds.Remove(Context.ConnectionId);
-				LastDisConnection = new Tuple<string, DateTime>(Context.ConnectionId, DateTime.UtcNow);
                 return base.OnDisconnected(stopCalled);
             }
-            // Add public static accessor
-            public static StreamingAPI GetStreamingAPI()
-            {
-                return streamingAPI;
-            }
-        }
-    }
+			// Add public static accessor
+			public static StreamingAPI GetStreamingAPI()
+			{
+				return streamingAPI;
+			}
+		}
+	}
 
     [RoutePrefix("api/market")]
     public class MarketController : ApiController
     {
-        public class MarketSubscribeRequest
+		public class MarketSubscribeRequest
         {
             public string MarketId { get; set; }
         }
 
         [HttpPost]
         [Route("subscribe")]
-        public IHttpActionResult SubscribeMarket([FromBody] MarketSubscribeRequest request)
-        {
-            var api = Program.MyHub.GetStreamingAPI();
-            if (api == null)
-                return BadRequest("Streaming API not connected");
-            
-            Debug.WriteLine($"subcribe to market {request.MarketId}");
-			api.SubscribeMarket(request.MarketId);
-            return Ok(new { subscribed = request.MarketId });
-        }
-		[HttpGet]
-		public IHttpActionResult Capture()
+		public IHttpActionResult SubscribeMarket([FromBody] MarketSubscribeRequest request)
 		{
-			var api = Program.MyHub.GetStreamingAPI();
-			if (api == null)
-				return BadRequest("Streaming API not connected");
-			
-            return Ok(new { 
-                status = "running", 
-                time = DateTime.UtcNow,
-				LastIncomingMessageTime = api.LastIncomingMessageTime,
-				LastConnection = Program.MyHub.LastConnection,
-				LastDisConnection = Program.MyHub.LastDisConnection,
-				LastReConnection = Program.MyHub.LastReConnection,
-                Program.MyHub.ConnectedIds
-				//LastIncomingMessage = api.LastIncomingMessage
-            });
+			Debug.WriteLine($"subcribe to market {request.MarketId}");
+			Program.WebSocketsHub.SubscribeMarket(this.Url.Request.RequestUri.IdnHost, request.MarketId);
+
+			return Ok(new { subscribed = request.MarketId });
 		}
-	}
-
-	public class TestController : ApiController
-    {
-        public class EchoRequest
-        {
-            public string Text { get; set; }
-            public int Count { get; set; }
-        }
-
-		[HttpGet]
-		public IHttpActionResult Status()
+		public IHttpActionResult UnSubscribeMarket([FromBody] MarketSubscribeRequest request)
 		{
-			var api = Program.MyHub.GetStreamingAPI();
-			if (api == null)
-				return BadRequest("Streaming API not connected");
-			return Ok(new { status = "running", time = DateTime.Now, } );
+			Debug.WriteLine($"unsubcribe from market {request.MarketId}");
+			Program.WebSocketsHub.UnSubscribeMarket(this.Url.Request.RequestUri.IdnHost, request.MarketId);
+
+			return Ok(new { unsubscribed = request.MarketId });
 		}
     }
 }

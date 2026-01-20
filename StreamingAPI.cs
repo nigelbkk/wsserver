@@ -66,7 +66,6 @@ namespace WSServer
     }
 
     public delegate void OrdersUpdateDelegate(string json1, string json2, string json3);
-    //public delegate void MarketUpdateDelegate(MarketSnapDto snap);
     public delegate void MarketUpdateDelegate(MarketChangeDto change);
 	class StreamingAPI
 	{
@@ -117,7 +116,6 @@ namespace WSServer
 					_clientCache = new ClientCache(client);
 					_clientCache.MarketCache.MarketChanged += OnMarketChanged;
 					_clientCache.OrderCache.OrderMarketChanged += OnOrderChanged;
-
 				}
 				return _clientCache;
 			}
@@ -221,18 +219,14 @@ namespace WSServer
 				Debug.WriteLine($"{xe.Message}");
 			}
 		}
-		int? subscription_count = 0;
 		private HashSet<String> _subscriptions = new HashSet<string>();
 		public void SubscribeMarket(String marketId)
 		{
 			Debug.WriteLine("SubscribeMarket " + MarketId);
-            _subscriptions.Add(marketId);
+			_subscriptions.Add(marketId);
 
-            MarketSubscriptionMessage msm = new MarketSubscriptionMessage
+			MarketSubscriptionMessage msm = new MarketSubscriptionMessage
 			{
-				Op = "marketSubscription",
-				Id = subscription_count++,
-
 				MarketFilter = new MarketFilter
 				{
 					MarketIds = _subscriptions.ToList()
@@ -243,9 +237,23 @@ namespace WSServer
 					LadderLevels = 3
 				}
 			};
-            ClientCache.SubscribeMarkets(msm);
-        }
-        public void SubscribeOrders()
+			ClientCache.SubscribeMarkets(msm);
+		}
+		public void UnSubscribeMarket(String marketId)
+		{
+			Debug.WriteLine("UnSubscribeMarket " + MarketId);
+			_subscriptions.Remove(marketId);
+
+			MarketSubscriptionMessage msm = new MarketSubscriptionMessage
+			{
+				MarketFilter = new MarketFilter
+				{
+					MarketIds = _subscriptions.ToList()
+				},
+			};
+			ClientCache.SubscribeMarkets(msm);
+		}
+		public void SubscribeOrders()
 		{ 
 			OrderSubscriptionMessage osm = new OrderSubscriptionMessage()
 			{
