@@ -86,7 +86,8 @@ namespace WSServer
 						_subscriptions[marketId] = set;
 
 						// first subscriber → subscribe upstream
-						streamingAPI.SubscribeMarket(marketId);
+						if (streamingAPI != null)
+							streamingAPI.SubscribeMarket(marketId);
 						_keepAliveMarket = marketId;
 					}
 
@@ -105,10 +106,15 @@ namespace WSServer
 					// IMPORTANT: only unsubscribe if this is NOT your "keep-alive" market
 					if (marketId != _keepAliveMarket)
 					{
-						streamingAPI.UnSubscribeMarket(marketId);
+                        if (streamingAPI != null)
+                            streamingAPI.UnSubscribeMarket(marketId);
 						_subscriptions.TryRemove(marketId, out set);
 					}
-				}
+					else
+					{
+                        Debug.WriteLine("{marketid} kept alive");
+                    }
+                }
 			}
 
 			private void ConnectStreamingAPI()
@@ -206,14 +212,16 @@ namespace WSServer
         [Route("subscribe")]
 		public IHttpActionResult SubscribeMarket([FromBody] MarketSubscribeRequest request)
 		{
-			Debug.WriteLine($"subcribe to market {request.MarketId}");
+			Debug.WriteLine($"{this.Url.Request.RequestUri.IdnHost} subcribes to market {request.MarketId}");
 			Program.WebSocketsHub.SubscribeMarket(this.Url.Request.RequestUri.IdnHost, request.MarketId);
 
 			return Ok(new { subscribed = request.MarketId });
 		}
-		public IHttpActionResult UnSubscribeMarket([FromBody] MarketSubscribeRequest request)
+        [HttpPost]
+        [Route("unsubscribe")]
+        public IHttpActionResult UnSubscribeMarket([FromBody] MarketSubscribeRequest request)
 		{
-			Debug.WriteLine($"unsubcribe from market {request.MarketId}");
+			Debug.WriteLine($"{this.Url.Request.RequestUri.IdnHost} unsubcribes from market {request.MarketId}");
 			Program.WebSocketsHub.UnSubscribeMarket(this.Url.Request.RequestUri.IdnHost, request.MarketId);
 
 			return Ok(new { unsubscribed = request.MarketId });
