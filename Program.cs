@@ -112,7 +112,7 @@ namespace WSServer
 					}
 					else
 					{
-                        Debug.WriteLine("{marketid} kept alive");
+                        Debug.WriteLine($"{marketId} kept alive");
                     }
                 }
 			}
