@@ -1,20 +1,14 @@
-﻿using Betfair.ESAClient;
-using Betfair.ESAClient.Cache;
-using Microsoft.AspNet.SignalR;
+﻿using Microsoft.AspNet.SignalR;
 using Microsoft.AspNet.SignalR.Hubs;
 using Microsoft.Owin;
 using Microsoft.Owin.Hosting;
 using Owin;
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Net.Sockets;
 using System.Net.WebSockets;
-using System.Runtime.Remoting.Contexts;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http;
 using WSServer;
@@ -117,6 +111,14 @@ namespace WSServer
                 }
 			}
 
+			public static void UnSubscribeAllMarkets(String connectionId)
+			{
+				foreach (var marketId in _subscriptions.Keys.ToList())
+				{
+					UnSubscribeMarket(marketId, connectionId);
+				}
+			}
+
 			private void ConnectStreamingAPI()
             {
 				Settings settings = Settings.DeSerialize();
@@ -183,7 +185,8 @@ namespace WSServer
                 {
                     object ipAddress;
                     Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
-					Debug.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " disconnected");
+					Debug.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " disconnected. Unsubscribe all markets");
+					Program.WebSocketsHub.UnSubscribeAllMarkets(ipAddress.ToString());
 				}
 				catch (Exception)
                 {
