@@ -115,7 +115,7 @@ namespace WSServer
 			{
 				foreach (var marketId in _subscriptions.Keys.ToList())
 				{
-					UnSubscribeMarket(marketId, connectionId);
+					UnSubscribeMarket(connectionId, marketId);
 				}
 			}
 
