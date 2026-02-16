@@ -90,25 +90,27 @@ namespace WSServer
 			}
 			public static void UnSubscribeMarket(String connectionId, String marketId)
 			{
-				if (!_subscriptions.TryGetValue(marketId, out var set))
-					return;
-
-				set.Remove(connectionId);
-
-				if (set.Count == 0)
+				lock (_subscriptions)
 				{
-					// IMPORTANT: only unsubscribe if this is NOT your "keep-alive" market
-					if (marketId != _keepAliveMarket)
+					if (!_subscriptions.TryGetValue(marketId, out var set))
+						return;
+
+					if (set.Count == 0)
 					{
-                        if (streamingAPI != null)
-                            streamingAPI.UnSubscribeMarket(marketId);
-						_subscriptions.TryRemove(marketId, out set);
+						// IMPORTANT: only unsubscribe if this is NOT your "keep-alive" market
+						if (marketId != _keepAliveMarket)
+						{
+							if (streamingAPI != null)
+								streamingAPI.UnSubscribeMarket(marketId);
+							//_subscriptions.TryRemove(marketId, out set);
+							set.Remove(connectionId);
+						}
+						else
+						{
+							Debug.WriteLine($"{marketId} kept alive");
+						}
 					}
-					else
-					{
-                        Debug.WriteLine($"{marketId} kept alive");
-                    }
-                }
+				}
 			}
 
 			public static void UnSubscribeAllMarkets(String connectionId)
@@ -162,6 +164,20 @@ namespace WSServer
                     Context.Request.Environment.TryGetValue("server.RemoteIpAddress", out ipAddress);
 					Debug.WriteLine(DateTime.UtcNow.ToString("HH:mm:ss") + " " + ipAddress + " connected");
                     ConnectedIds.Add(Context.ConnectionId);
+
+
+					var timer = new System.Timers.Timer(1000);
+					timer.Elapsed += (s, e) =>
+					{
+						Clients.All.marketUpdate(new
+						{
+							MarketId = "1.234567890",
+							Timestamp = DateTime.UtcNow,
+							TotalMatched = 12345.67
+						});
+					};
+					timer.Start();
+
 					return base.OnConnected();
                 }
 				catch (Exception ex)
