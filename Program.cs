@@ -125,30 +125,32 @@ namespace WSServer
             {
 				Settings settings = Settings.DeSerialize();
                 streamingAPI = Program.streamingAPI;
-				streamingAPI.OrdersCallback = (String json1, String json2, String json3) =>				
+				streamingAPI.OrdersCallback = (String json1, String json3) =>				
 				{
                     //Debug.WriteLine("Hub OrdersCallback");
                     try
                     {
-                        Clients.All.ordersChanged(json1, json2, json3);
+                        return Clients.All.ordersChanged(json1, json3);
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine(ex.Message);
+						Debug.WriteLine(ex.Message);
                     }
+					return null;
 				};
 				streamingAPI.MarketCallback += (MarketChangeDto change) =>
 				{
 					//Debug.WriteLine($"Hub MarktCallback:");
                     try
                     {
-				    	Clients.All.marketChanged(change);
+						return Clients.All.marketChanged(change);
                     }
                     catch (Exception ex)
                     {
                         Debug.WriteLine(ex.Message);
                     }
-                };
+					return null;
+				};
 			}
 			public override Task OnConnected()
             {

@@ -5,6 +5,7 @@ using Betfair.ESASwagger.Model;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -64,16 +65,18 @@ namespace WSServer
         public double Price { get; set; }
         public double Size { get; set; }
     }
-
-    public delegate void OrdersUpdateDelegate(string json1, string json2, string json3);
-    public delegate void MarketUpdateDelegate(MarketChangeDto change);
+	
+	public delegate Task OrdersUpdateDelegate(string changeJson, string snapJson);
+	public delegate Task MarketUpdateDelegate(MarketChangeDto change);
 	class StreamingAPI
 	{
 		public OrdersUpdateDelegate OrdersCallback = null;
 		public MarketUpdateDelegate MarketCallback = null;
-		public DateTime LastIncomingMessageTime;
-		public OrderMarketChangedEventArgs LastIncomingMessage;
-		private static String ConnectionId { get; set; }
+		//public DateTime LastIncomingMessageTime;
+		//public OrderMarketChangedEventArgs LastIncomingMessage;
+		
+        private readonly BlockingCollection<OrderMarketChangedEventArgs> _queue = new BlockingCollection<OrderMarketChangedEventArgs>(); 
+        private static String ConnectionId { get; set; }
 		private static String MarketId { get; set; }
 		private static AppKeyAndSessionProvider SessionProvider { get; set; }
 		private static ClientCache _clientCache;
@@ -195,7 +198,24 @@ namespace WSServer
             return dto;
         }
 
-        private void OnMarketChanged(object sender, MarketChangedEventArgs e)
+		private async Task ProcessLoop()
+		{
+			foreach (var e in _queue.GetConsumingEnumerable())
+			{
+				try
+				{
+					var changeJson = JsonConvert.SerializeObject(e.Change);
+					var snapJson = JsonConvert.SerializeObject(e.Snap);
+
+					await OrdersCallback(changeJson, snapJson);
+				}
+				catch (Exception ex)
+				{
+					Debug.WriteLine($"PROCESS ERROR: {ex}");
+				}
+			}
+		}
+		private void OnMarketChanged(object sender, MarketChangedEventArgs e)
         {
             String json = e.Change.ToJson();
             DateTime Time = e.Snap.Time;
@@ -206,18 +226,18 @@ namespace WSServer
         }
 		private void OnOrderChanged(object sender, OrderMarketChangedEventArgs e)
 		{
-            //Debug.WriteLine("StreamingAPI OnOrderChanged");
-            try
-            {
-				LastIncomingMessage = e;
-				LastIncomingMessageTime = DateTime.UtcNow;
-				if (OrdersCallback != null)
-					OrdersCallback( JsonConvert.SerializeObject(e.Change), null, JsonConvert.SerializeObject(e.Snap)); 
-			}
-			catch (Exception xe)
-			{
-				Debug.WriteLine($"{xe.Message}");
-			}
+			_queue.Add(e);
+			//try
+   //         {
+			//	LastIncomingMessage = e;
+			//	LastIncomingMessageTime = DateTime.UtcNow;
+			//	if (OrdersCallback != null)
+			//		OrdersCallback( JsonConvert.SerializeObject(e.Change), null, JsonConvert.SerializeObject(e.Snap)); 
+			//}
+			//catch (Exception xe)
+			//{
+			//	Debug.WriteLine($"{xe.Message}");
+			//}
 		}
 		private HashSet<String> _subscriptions = new HashSet<string>();
 		public void SubscribeMarket(String marketId)
