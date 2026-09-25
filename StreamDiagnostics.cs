@@ -10,6 +10,7 @@ namespace WSServer
     {
         private static readonly object Sync = new object();
         private static TextWriterTraceListener FileListener;
+        private static string LogPath;
 
         public static void Initialise()
         {
@@ -20,7 +21,8 @@ namespace WSServer
 
                 var directory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
                 Directory.CreateDirectory(directory);
-                FileListener = new TextWriterTraceListener(Path.Combine(directory, "stream-diagnostics.log"));
+                LogPath = Path.Combine(directory, "stream-diagnostics.log");
+                FileListener = new TextWriterTraceListener(LogPath);
                 Trace.Listeners.Add(FileListener);
                 Trace.AutoFlush = true;
                 Write("diagnostics.initialised");
@@ -31,8 +33,10 @@ namespace WSServer
         {
             lock (Sync)
             {
-                Trace.WriteLine($"{DateTime.UtcNow:O} {message}");
-                Trace.Flush();
+                var line = $"{DateTime.UtcNow:O} {message}{Environment.NewLine}";
+                if (LogPath != null)
+                    File.AppendAllText(LogPath, line);
+                Debug.WriteLine(line.TrimEnd());
             }
         }
 
