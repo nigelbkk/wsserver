@@ -36,7 +36,6 @@ namespace WSServer
                 var line = $"{DateTime.UtcNow:O} {message}{Environment.NewLine}";
                 if (LogPath != null)
                     File.AppendAllText(LogPath, line);
-                Debug.WriteLine(line.TrimEnd());
             }
         }
 
