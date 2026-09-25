@@ -22,6 +22,7 @@ namespace WSServer
         static StreamingAPI streamingAPI;
 		static void Main(string[] args)
         {
+			StreamDiagnostics.Initialise();
 			string url = "http://88.202.230.157:8088";
 			url = "http://127.0.0.1:8088";
             url = "http://*:8088";
@@ -74,6 +75,8 @@ namespace WSServer
 			{
 				lock (_subscriptions)
 				{
+					var alreadyTracked = _subscriptions.ContainsKey(marketId);
+					StreamDiagnostics.Write($"http.subscribe client={connectionId} market={marketId} alreadyTracked={alreadyTracked} trackedMarkets={_subscriptions.Count}");
 					if (!_subscriptions.TryGetValue(marketId, out var set))
 					{
 						set = new HashSet<string>();
@@ -92,6 +95,7 @@ namespace WSServer
 			{
 				lock (_subscriptions)
 				{
+					StreamDiagnostics.Write($"http.unsubscribe client={connectionId} market={marketId} trackedMarkets={_subscriptions.Count}");
 					if (!_subscriptions.TryGetValue(marketId, out var set))
 						return;
 

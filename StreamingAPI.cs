@@ -84,25 +84,22 @@ namespace WSServer
 		private static int _port = 443;
 		public StreamingAPI(String AppKey, String BFUser, String BFPassword, string cert, string cert_password)
 		{
-			var savedListeners = Trace.Listeners.Cast<TraceListener>().ToList();
-			Trace.Listeners.Clear();
 			NewSessionProvider("identitysso-cert.betfair.com", AppKey, BFUser, BFPassword, cert, cert_password);
 
-			ClientCache.Start();		// Connect WebSocket
-			SubscribeOrders();         
-
-			ClientCache.Client.ConnectionStatusChanged += (o, e) =>
+			var clientCache = ClientCache;
+			clientCache.Client.ConnectionStatusChanged += (o, e) =>
 			{
+				StreamDiagnostics.ConnectionStatus(e);
 				if (!String.IsNullOrEmpty(e.ConnectionId))
 				{
 					ConnectionId = e.ConnectionId;
 				}
 			};
-			// Restore Trace listeners
-			foreach (var listener in savedListeners)
-			{
-				Trace.Listeners.Add(listener);
-			}
+			StreamDiagnostics.Write("betfair.connect.start");
+			clientCache.Start();		// Connect WebSocket
+			StreamDiagnostics.Write("betfair.orders.subscribe.start");
+			SubscribeOrders();
+			StreamDiagnostics.Write("betfair.orders.subscribe.complete");
 		}
 		public void NewSessionProvider(string ssohost, string appkey, string username, string password, string cert, string cert_password)
 		{
@@ -242,8 +239,8 @@ namespace WSServer
 		private HashSet<String> _subscriptions = new HashSet<string>();
 		public void SubscribeMarket(String marketId)
 		{
-			Debug.WriteLine("SubscribeMarket " + MarketId);
-			_subscriptions.Add(marketId);
+			var added = _subscriptions.Add(marketId);
+			StreamDiagnostics.Write($"betfair.subscribe market={marketId} added={added} distinctMarkets={_subscriptions.Count}");
 
 			MarketSubscriptionMessage msm = new MarketSubscriptionMessage
 			{
@@ -257,12 +254,21 @@ namespace WSServer
 					LadderLevels = 3
 				}
 			};
-			ClientCache.SubscribeMarkets(msm);
+			try
+			{
+				ClientCache.SubscribeMarkets(msm);
+				StreamDiagnostics.Write($"betfair.subscribe.sent market={marketId} distinctMarkets={_subscriptions.Count}");
+			}
+			catch (Exception ex)
+			{
+				StreamDiagnostics.Write($"betfair.subscribe.error market={marketId} type={ex.GetType().FullName} message={ex.Message}");
+				throw;
+			}
 		}
 		public void UnSubscribeMarket(String marketId)
 		{
-			Debug.WriteLine("UnSubscribeMarket " + MarketId);
-			_subscriptions.Remove(marketId);
+			var removed = _subscriptions.Remove(marketId);
+			StreamDiagnostics.Write($"betfair.unsubscribe market={marketId} removed={removed} distinctMarkets={_subscriptions.Count}");
 
 			MarketSubscriptionMessage msm = new MarketSubscriptionMessage
 			{
@@ -271,7 +277,16 @@ namespace WSServer
 					MarketIds = _subscriptions.ToList()
 				},
 			};
-			ClientCache.SubscribeMarkets(msm);
+			try
+			{
+				ClientCache.SubscribeMarkets(msm);
+				StreamDiagnostics.Write($"betfair.unsubscribe.sent market={marketId} distinctMarkets={_subscriptions.Count}");
+			}
+			catch (Exception ex)
+			{
+				StreamDiagnostics.Write($"betfair.unsubscribe.error market={marketId} type={ex.GetType().FullName} message={ex.Message}");
+				throw;
+			}
 		}
 		public void SubscribeOrders()
 		{ 
@@ -279,7 +294,16 @@ namespace WSServer
 			{
 				SegmentationEnabled = true
 			};
-			ClientCache.SubscribeOrders(osm);
+			try
+			{
+				ClientCache.SubscribeOrders(osm);
+				StreamDiagnostics.Write("betfair.orders.subscribe.sent");
+			}
+			catch (Exception ex)
+			{
+				StreamDiagnostics.Write($"betfair.orders.subscribe.error type={ex.GetType().FullName} message={ex.Message}");
+				throw;
+			}
 		}
 		public void Stop()
 		{
